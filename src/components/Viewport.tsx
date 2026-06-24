@@ -5,7 +5,7 @@ import type { CanvasTool, PendingPathState } from "../domain/model";
 import { moveSelection, round, sameSelection, updateArray, updateAreasAtPath } from "../editor/utils";
 import { AreaSvg, HillSvg, PathSvg } from "./viewport/MapObjects";
 import { SelectionHandles } from "./viewport/SelectionHandles";
-import { selectionKey } from "./viewport/svgHelpers";
+import { applyLiveDrag, applySelectedGeometryPreview, clearLiveDrag } from "./viewport/sceneController";
 
 type LiveDragState = {
   selection: Selection;
@@ -21,6 +21,7 @@ type LiveEditHandleDragState = {
   handle: string;
   index?: number;
   last: Point2;
+  previewLevel: LevelV1;
   moved: boolean;
 };
 
@@ -81,7 +82,7 @@ export function Viewport(props: Props) {
         const handleElement = event.target instanceof Element ? event.target.closest("[data-handle]") as HTMLElement | null : null;
         if (handleElement) {
           event.currentTarget.setPointerCapture(event.pointerId);
-          liveEditHandleDragRef.current = { selection: structuredClone(props.selection), handle: handleElement.dataset.handle ?? "", index: handleElement.dataset.handleIndex === undefined ? undefined : Number(handleElement.dataset.handleIndex), last: world, moved: false };
+          liveEditHandleDragRef.current = { selection: structuredClone(props.selection), handle: handleElement.dataset.handle ?? "", index: handleElement.dataset.handleIndex === undefined ? undefined : Number(handleElement.dataset.handleIndex), last: world, previewLevel: structuredClone(level), moved: false };
           props.onFreezeViewport();
           return;
         }
@@ -110,8 +111,9 @@ export function Viewport(props: Props) {
           const dx = round(world[0] - drag.last[0]);
           const dz = round(world[1] - drag.last[1]);
           if (dx === 0 && dz === 0) return;
-          props.onUpdateLevel((current) => moveEditHandle(current, drag.selection, drag.handle, drag.index, world, dx, dz));
-          liveEditHandleDragRef.current = { ...drag, last: world, moved: true };
+          const previewLevel = moveEditHandle(drag.previewLevel, drag.selection, drag.handle, drag.index, world, dx, dz);
+          liveEditHandleDragRef.current = { ...drag, last: world, previewLevel, moved: true };
+          applySelectedGeometryPreview(event.currentTarget, previewLevel, drag.selection);
           return;
         }
         if (liveDragRef.current) {
@@ -120,7 +122,7 @@ export function Viewport(props: Props) {
           const dz = round(world[1] - drag.start[1]);
           if (dx === drag.dx && dz === drag.dz) return;
           liveDragRef.current = { ...drag, last: world, dx, dz, moved: dx !== 0 || dz !== 0 };
-          applyLiveDrag(event.currentTarget, liveDragRef.current);
+          applyLiveDrag(event.currentTarget, drag.selection, dx, dz, dx !== 0 || dz !== 0);
         }
       }}
       onPointerUp={(event) => {
@@ -129,12 +131,15 @@ export function Viewport(props: Props) {
           clearLiveDrag(event.currentTarget, drag.selection);
           props.onUpdateLevel((current) => moveSelection(current, drag.selection, drag.dx, drag.dz));
         }
+        const handleDrag = liveEditHandleDragRef.current;
+        if (handleDrag?.moved) props.onUpdateLevel(() => handleDrag.previewLevel);
         liveDragRef.current = null;
         liveEditHandleDragRef.current = null;
         props.onReleaseViewport();
       }}
       onPointerCancel={(event) => {
         if (liveDragRef.current) clearLiveDrag(event.currentTarget, liveDragRef.current.selection);
+        if (liveEditHandleDragRef.current) applySelectedGeometryPreview(event.currentTarget, level, liveEditHandleDragRef.current.selection);
         liveDragRef.current = null;
         liveEditHandleDragRef.current = null;
         props.onReleaseViewport();
@@ -158,46 +163,13 @@ export function Viewport(props: Props) {
       {level.dirtPaths.map((path, index) => <PathSvg key={path.id} shape={path.shape} item={{ kind: "dirtPath", index }} selection={props.selection} color="#9a6a43" width={path.width} className="dirt" />)}
       {level.fences.map((fence, index) => <PathSvg key={fence.id} shape={fence.shape} item={{ kind: "fence", index }} selection={props.selection} color="#6f482e" width={0.24} className="fence" />)}
       {props.pendingPath ? <circle cx={props.pendingPath.start[0]} cy={props.pendingPath.start[1]} r="0.3" fill="#1d4ed8" stroke="#ffffff" strokeWidth="0.08" /> : null}
-      <g data-select-kind="spawn" className={`map-object ${sameSelection(props.selection, { kind: "spawn" }) ? "selected-object" : ""}`} transform={`translate(${level.spawn.position[0]} ${level.spawn.position[1]}) rotate(${level.spawn.headingDegrees})`}>
+      <g data-selection-key="spawn::" data-select-kind="spawn" className={`map-object ${sameSelection(props.selection, { kind: "spawn" }) ? "selected-object" : ""}`} transform={`translate(${level.spawn.position[0]} ${level.spawn.position[1]}) rotate(${level.spawn.headingDegrees})`}>
         <circle r="0.38" fill="#ffffff" stroke="#1d4ed8" strokeWidth="0.1" />
         <path d="M -0.18 0.15 L 0 -0.22 L 0.18 0.15 Z" fill="#1d4ed8" />
       </g>
       <SelectionHandles level={level} selection={props.selection} />
     </svg>
   );
-}
-
-function applyLiveDrag(svg: SVGSVGElement, drag: LiveDragState) {
-  const transform = drag.moved ? `translate(${drag.dx} ${drag.dz})` : "";
-  setLiveTransform(findSelectionElement(svg, drag.selection), transform);
-  setLiveTransform(svg.querySelector<SVGGElement>(".edit-handles") ?? undefined, transform);
-}
-
-function clearLiveDrag(svg: SVGSVGElement, selection: Selection) {
-  restoreLiveTransform(findSelectionElement(svg, selection));
-  restoreLiveTransform(svg.querySelector<SVGGElement>(".edit-handles") ?? undefined);
-}
-
-function findSelectionElement(svg: SVGSVGElement, selection: Selection): SVGGraphicsElement | undefined {
-  const key = selectionKey(selection);
-  return Array.from(svg.querySelectorAll<SVGGraphicsElement>("[data-selection-key]")).find((element) => element.dataset.selectionKey === key);
-}
-
-function setLiveTransform(element: SVGGraphicsElement | undefined, transform: string) {
-  if (!element) return;
-  if (element.dataset.liveBaseTransform === undefined) element.dataset.liveBaseTransform = element.getAttribute("transform") ?? "";
-  const base = element.dataset.liveBaseTransform;
-  const next = [transform, base].filter(Boolean).join(" ");
-  if (next) element.setAttribute("transform", next);
-  else element.removeAttribute("transform");
-}
-
-function restoreLiveTransform(element: SVGGraphicsElement | undefined) {
-  if (!element || element.dataset.liveBaseTransform === undefined) return;
-  const base = element.dataset.liveBaseTransform;
-  if (base) element.setAttribute("transform", base);
-  else element.removeAttribute("transform");
-  delete element.dataset.liveBaseTransform;
 }
 
 function moveEditHandle(level: LevelV1, item: Selection, handle: string, index: number | undefined, world: Point2, dx: number, dz: number): LevelV1 {
