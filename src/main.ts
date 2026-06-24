@@ -1,4 +1,6 @@
 import "./styles.css";
+import { areaBlueprints, createAreaFromBlueprint } from "./domain/blueprints";
+import { moveAreaShapeHandle, movePathShapeHandle } from "./domain/editHandles";
 import {
   normalizeRect,
   pathBounds,
@@ -70,12 +72,6 @@ type EditHandleDragState = {
   moved: boolean;
 } | null;
 
-type AreaBlueprint = {
-  key: string;
-  label: string;
-  create: (point: Point2) => Area;
-};
-
 let pack: MapPackV1 = clone(defaultPack);
 let selectedLevelIndex = 0;
 let selection: Selection = { kind: "level" };
@@ -90,48 +86,6 @@ let editHandleDragState: EditHandleDragState = null;
 let activeViewportBounds: Rect | null = null;
 let sidebarCollapsed = false;
 let sidebarPanes = { tree: true, inspector: true, json: false };
-
-const areaBlueprints: AreaBlueprint[] = [
-  {
-    key: "clover",
-    label: "Clover patch here",
-    create: (point) => ({
-      id: uniqueId("cloverPatch"),
-      kind: "area",
-      composition: "replace",
-      role: "lawn",
-      shape: { type: "circle", center: point, radius: 2 },
-      edgeFalloff: 0.6,
-      vegetation: [{ id: uniqueId("cloverLayer"), type: "clover", distribution: defaultPerlinDistribution(1, Date.now() % 10000) }],
-    }),
-  },
-  {
-    key: "flowers",
-    label: "Flower scatter here",
-    create: (point) => ({
-      id: uniqueId("flowerScatter"),
-      kind: "area",
-      composition: "additive",
-      shape: { type: "rectangle", center: point, size: [3, 2] },
-      edgeFalloff: 0.4,
-      vegetation: [
-        { id: uniqueId("yellowFlowers"), type: "flowerYellow", distribution: defaultPerlinDistribution(0.2, Date.now() % 10000) },
-        { id: uniqueId("redFlowers"), type: "flowerRed", distribution: defaultPerlinDistribution(0.16, (Date.now() + 31) % 10000) },
-      ],
-    }),
-  },
-  {
-    key: "bed",
-    label: "Bed here",
-    create: (point) => ({
-      id: uniqueId("flowerBed"),
-      kind: "area",
-      role: "bed",
-      shape: { type: "circle", center: point, radius: 1.4 },
-      vegetation: [{ id: uniqueId("tulipLayer"), type: "tulip", distribution: { type: "uniform", density: 0.35 } }],
-    }),
-  },
-];
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing #app root");
@@ -537,45 +491,6 @@ function moveEditHandle(item: Selection, handle: string, index: number | undefin
       fences: updateArray(level.fences, item.index!, { ...level.fences[item.index!], shape: movePathShapeHandle(level.fences[item.index!].shape, handle, index, world, dx, dz) }),
     }), false);
   }
-}
-
-function moveAreaShapeHandle(shape: AreaShape, handle: string, index: number | undefined, world: Point2, dx: number, dz: number): AreaShape {
-  if (shape.type === "circle") {
-    if (handle === "center") return { ...shape, center: translatePoint(shape.center, dx, dz) };
-    if (handle === "radius") {
-      const radius = Math.max(0.1, Math.hypot(world[0] - shape.center[0], world[1] - shape.center[1]));
-      return { ...shape, radius: round(radius) };
-    }
-  }
-  if (shape.type === "rectangle") {
-    if (handle === "center") return { ...shape, center: translatePoint(shape.center, dx, dz) };
-    if (handle === "corner") {
-      return { ...shape, size: [Math.max(0.1, round(Math.abs(world[0] - shape.center[0]) * 2)), Math.max(0.1, round(Math.abs(world[1] - shape.center[1]) * 2))] };
-    }
-  }
-  if (shape.type === "polygon" && handle === "vertex" && index !== undefined) {
-    return { ...shape, points: updateArray(shape.points, index, [round(world[0]), round(world[1])]) };
-  }
-  return shape;
-}
-
-function movePathShapeHandle(shape: PathShape, handle: string, index: number | undefined, world: Point2, dx: number, dz: number): PathShape {
-  const point: Point2 = [round(world[0]), round(world[1])];
-  if (shape.type === "line") {
-    if (handle === "start") return { ...shape, start: point };
-    if (handle === "end") return { ...shape, end: point };
-  }
-  if (shape.type === "polyline" && handle === "vertex" && index !== undefined) {
-    return { ...shape, points: updateArray(shape.points, index, point) };
-  }
-  if (shape.type === "cubicBezierPath") {
-    if (handle === "start") return { ...shape, start: point };
-    if (index === undefined) return shape;
-    const curveIndex = Math.floor(index / 3);
-    const key = ["c1", "c2", "end"][index % 3] as "c1" | "c2" | "end";
-    return { ...shape, curves: updateArray(shape.curves, curveIndex, { ...shape.curves[curveIndex], [key]: point }) };
-  }
-  return translatePathShape(shape, dx, dz);
 }
 
 function renderLevelSelector(): string {
@@ -1225,13 +1140,22 @@ function renderAreaShapeHandles(shape: AreaShape): string {
     return shape.points.map((point, index) => renderHandle(point, "vertex", index)).join("");
   }
   const rect = rectFromCenter(shape.center, shape.size);
-  const corners: Point2[] = [
+  const rotation = ((shape.rotationDegrees ?? 0) * Math.PI) / 180;
+  const rotatePoint = (point: Point2): Point2 => {
+    const dx = point[0] - shape.center[0];
+    const dz = point[1] - shape.center[1];
+    return [round(shape.center[0] + dx * Math.cos(rotation) - dz * Math.sin(rotation)), round(shape.center[1] + dx * Math.sin(rotation) + dz * Math.cos(rotation))];
+  };
+  const cornerPoints: Point2[] = [
     [rect.xMin, rect.zMin],
     [rect.xMax, rect.zMin],
     [rect.xMax, rect.zMax],
     [rect.xMin, rect.zMax],
   ];
-  return `${renderHandle(shape.center, "center", undefined, true)}${corners.map((point, index) => renderHandle(point, "corner", index)).join("")}`;
+  const corners = cornerPoints.map(rotatePoint);
+  const topCenter = rotatePoint([shape.center[0], rect.zMin]);
+  const rotateHandle = rotatePoint([shape.center[0], rect.zMin - Math.max(0.8, Math.min(shape.size[0], shape.size[1]) * 0.25)]);
+  return `${renderHandle(shape.center, "center", undefined, true)}${corners.map((point, index) => renderHandle(point, "corner", index)).join("")}<line class="edit-handle-guide" x1="${topCenter[0]}" y1="${topCenter[1]}" x2="${rotateHandle[0]}" y2="${rotateHandle[1]}" />${renderHandle(rotateHandle, "rotate")}`;
 }
 
 function renderPathHandles(shape: PathShape | undefined): string {
@@ -1250,7 +1174,10 @@ function renderPathHandles(shape: PathShape | undefined): string {
 
 function renderHandle(point: Point2, handle: string, index?: number, anchor = false): string {
   const indexAttr = index === undefined ? "" : ` data-handle-index="${index}"`;
-  return `<circle class="edit-handle ${anchor ? "anchor" : ""}" data-handle="${handle}"${indexAttr} cx="${point[0]}" cy="${point[1]}" r="${anchor ? 0.2 : 0.16}" />`;
+  return `<g class="edit-handle-node" data-handle="${handle}"${indexAttr}>
+    <circle class="edit-handle-hit" cx="${point[0]}" cy="${point[1]}" r="${anchor ? 0.42 : 0.36}" />
+    <circle class="edit-handle ${anchor ? "anchor" : ""}" cx="${point[0]}" cy="${point[1]}" r="${anchor ? 0.2 : 0.16}" />
+  </g>`;
 }
 
 function renderAreaSvg(area: Area, path: number[], depth: number): string {
@@ -1473,9 +1400,8 @@ function addAreaAt(point: Point2, parentPath?: number[]): void {
 }
 
 function addAreaBlueprint(key: string, point: Point2): void {
-  const blueprint = areaBlueprints.find((item) => item.key === key);
-  if (!blueprint) return;
-  const area = blueprint.create(point);
+  const area = createAreaFromBlueprint(key, point, uniqueId);
+  if (!area) return;
   contextMenu = null;
   const parentPath = selection.kind === "area" ? selection.path : undefined;
   const path = addAreaToLevel(area, parentPath);

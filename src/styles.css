@@ -364,12 +364,21 @@ label {
   pointer-events: none;
 }
 
+.edit-handle-node {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.edit-handle-hit {
+  fill: transparent;
+  stroke: transparent;
+}
+
 .edit-handle {
   fill: #ffffff;
   stroke: #1d4ed8;
   stroke-width: 0.08;
-  cursor: pointer;
-  pointer-events: all;
+  pointer-events: none;
   vector-effect: non-scaling-stroke;
 }
 

@@ -8,16 +8,20 @@
 ## Phase 1: Modularize the Existing Editor
 
 - Split the current single-file editor into domain, state, geometry, import/export, viewport, inspector, sidebar, context menu, and wiring modules.
+  - Done so far: domain model, geometry, validation, normalization, blueprint definitions, and edit-handle mutation math.
 - Keep behavior stable during the first pass so later UI fixes are easier to isolate.
 - Prefer pure functions for map/domain operations and keep DOM rendering/wiring at the edge.
 - Add lightweight tests once pure modules exist.
+  - Done: dependency-free domain smoke tests for normalization, validation, blueprints, geometry, and rectangle rotation handles.
 
 ## Phase 2: Viewport Usability
 
 - Replace the giant selected-object stroke with subtle selection styling plus dedicated handles.
 - Add edit handles for rectangle center/size/rotation, circle center/radius, polygon vertices, path vertices, Bezier controls, spawn heading, and hill controls.
+  - Done: rotation handles added for rectangles.
 - Cap auto-pan/viewport-follow speed while dragging near edges.
 - Improve hit targets without visually overwhelming the map.
+  - Done: edit handles now have larger invisible hit targets while keeping the visible handles small.
 - Add direct polygon/path editing tools so routine edits do not require text/JSON editing.
 
 ## Phase 3: Sidebar and Panels
@@ -32,6 +36,7 @@
 - Move all creation actions into one `Add` submenu.
 - Remove the standalone `Replace clover` concept from the context menu.
 - Introduce archetypes/blueprints as a separate model concept before exposing pinned archetypes in the UI.
+  - Done: area blueprints now live in a domain module and are instantiated through an explicit helper.
 - Consider user-pinned archetypes only after the base add flow is clean.
 
 ## Phase 5: Editing Stability
