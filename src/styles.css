@@ -234,23 +234,6 @@ label {
   padding: 0.6rem;
 }
 
-.tree-resizer {
-  border-top: 1px solid #c9d9c2;
-  border-bottom: 1px solid #dbe8d5;
-  background: linear-gradient(#eef6ea, #e4efdf);
-  cursor: row-resize;
-}
-
-.tree-resizer::before {
-  content: "";
-  display: block;
-  width: 2.5rem;
-  height: 2px;
-  margin: 3px auto 0;
-  border-radius: 999px;
-  background: #9eb397;
-}
-
 .tree {
   display: grid;
   gap: 1px;

@@ -56,6 +56,12 @@ type EditHandleDragState = {
   moved: boolean;
 } | null;
 
+type AreaBlueprint = {
+  key: string;
+  label: string;
+  create: (point: Point2) => Area;
+};
+
 let pack: MapPackV1 = clone(defaultPack);
 let selectedLevelIndex = 0;
 let selection: Selection = { kind: "level" };
@@ -68,9 +74,50 @@ let contextMenu: ContextMenuState = null;
 let dragState: DragState = null;
 let editHandleDragState: EditHandleDragState = null;
 let activeViewportBounds: Rect | null = null;
-let treePanePx = 360;
 let sidebarCollapsed = false;
 let sidebarPanes = { tree: true, inspector: true, json: false };
+
+const areaBlueprints: AreaBlueprint[] = [
+  {
+    key: "clover",
+    label: "Clover patch here",
+    create: (point) => ({
+      id: uniqueId("cloverPatch"),
+      kind: "area",
+      composition: "replace",
+      role: "lawn",
+      shape: { type: "circle", center: point, radius: 2 },
+      edgeFalloff: 0.6,
+      vegetation: [{ id: uniqueId("cloverLayer"), type: "clover", distribution: defaultPerlinDistribution(1, Date.now() % 10000) }],
+    }),
+  },
+  {
+    key: "flowers",
+    label: "Flower scatter here",
+    create: (point) => ({
+      id: uniqueId("flowerScatter"),
+      kind: "area",
+      composition: "additive",
+      shape: { type: "rectangle", center: point, size: [3, 2] },
+      edgeFalloff: 0.4,
+      vegetation: [
+        { id: uniqueId("yellowFlowers"), type: "flowerYellow", distribution: defaultPerlinDistribution(0.2, Date.now() % 10000) },
+        { id: uniqueId("redFlowers"), type: "flowerRed", distribution: defaultPerlinDistribution(0.16, (Date.now() + 31) % 10000) },
+      ],
+    }),
+  },
+  {
+    key: "bed",
+    label: "Bed here",
+    create: (point) => ({
+      id: uniqueId("flowerBed"),
+      kind: "area",
+      role: "bed",
+      shape: { type: "circle", center: point, radius: 1.4 },
+      vegetation: [{ id: uniqueId("tulipLayer"), type: "tulip", distribution: { type: "uniform", density: 0.35 } }],
+    }),
+  },
+];
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing #app root");
@@ -1076,9 +1123,7 @@ function renderContextMenu(): string {
       <summary>Add</summary>
       <button id="ctx-add-area" type="button">Lawn area here</button>
       <button id="ctx-add-child-area" type="button">${areaTarget ? "Child area here" : "Area here"}</button>
-      <button id="ctx-add-clover" type="button">Clover patch here</button>
-      <button id="ctx-add-flowers" type="button">Flower scatter here</button>
-      <button id="ctx-add-bed" type="button">Bed here</button>
+      ${areaBlueprints.map((blueprint) => `<button id="ctx-add-blueprint-${escapeAttr(blueprint.key)}" type="button">${escapeText(blueprint.label)}</button>`).join("")}
       <button id="ctx-add-fence-start" type="button">${pendingPath?.kind === "fence" ? "Finish fence at crosshair" : "Start fence at crosshair"}</button>
       <button id="ctx-add-road" type="button">Short road here</button>
       <button id="ctx-add-dirt-path" type="button">Short dirt path here</button>
@@ -1413,33 +1458,9 @@ function wireGlobalActions(): void {
     });
   });
 
-  wireTreeResizer();
   wireButtons();
   wireJsonActions();
   wireSvg();
-}
-
-function wireTreeResizer(): void {
-  const treeResizer = document.getElementById("tree-resizer");
-  const sidebar = document.querySelector<HTMLElement>(".editor-sidebar");
-  treeResizer?.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    treeResizer.setPointerCapture(event.pointerId);
-    const onMove = (moveEvent: PointerEvent) => {
-      if (!sidebar) return;
-      const rect = sidebar.getBoundingClientRect();
-      const minPane = 150;
-      const handle = 8;
-      treePanePx = Math.max(minPane, Math.min(moveEvent.clientY - rect.top, rect.height - minPane - handle));
-      sidebar.style.setProperty("--tree-pane", `${treePanePx}px`);
-    };
-    const onUp = () => {
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
-    };
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp);
-  });
 }
 
 function wireButtons(): void {
@@ -1532,9 +1553,9 @@ function wireContextButtons(): void {
     const parentPath = contextMenu.target?.kind === "area" ? contextMenu.target.path : selection.kind === "area" ? selection.path : undefined;
     addAreaAt(contextMenu.world, parentPath);
   });
-  document.getElementById("ctx-add-clover")?.addEventListener("click", () => contextMenu && addCloverArea(contextMenu.world));
-  document.getElementById("ctx-add-flowers")?.addEventListener("click", () => contextMenu && addFlowerArea(contextMenu.world));
-  document.getElementById("ctx-add-bed")?.addEventListener("click", () => contextMenu && addBedArea(contextMenu.world));
+  areaBlueprints.forEach((blueprint) => {
+    document.getElementById(`ctx-add-blueprint-${blueprint.key}`)?.addEventListener("click", () => contextMenu && addAreaBlueprint(blueprint.key, contextMenu.world));
+  });
   document.getElementById("ctx-add-fence-start")?.addEventListener("click", () => {
     if (!contextMenu) return;
     handlePathToolClick("fence", contextMenu.world);
@@ -1578,50 +1599,10 @@ function addAreaAt(point: Point2, parentPath?: number[]): void {
   render();
 }
 
-function addCloverArea(point: Point2): void {
-  const area: Area = {
-    id: uniqueId("cloverPatch"),
-    kind: "area",
-    composition: "replace",
-    role: "lawn",
-    shape: { type: "circle", center: point, radius: 2 },
-    edgeFalloff: 0.6,
-    vegetation: [{ id: uniqueId("cloverLayer"), type: "clover", distribution: defaultPerlinDistribution(1, Date.now() % 10000) }],
-  };
-  contextMenu = null;
-  const parentPath = selection.kind === "area" ? selection.path : undefined;
-  const path = addAreaToLevel(area, parentPath);
-  selection = { kind: "area", path };
-  render();
-}
-
-function addFlowerArea(point: Point2): void {
-  const area: Area = {
-    id: uniqueId("flowerScatter"),
-    kind: "area",
-    composition: "additive",
-    shape: { type: "rectangle", center: point, size: [3, 2] },
-    edgeFalloff: 0.4,
-    vegetation: [
-      { id: uniqueId("yellowFlowers"), type: "flowerYellow", distribution: defaultPerlinDistribution(0.2, Date.now() % 10000) },
-      { id: uniqueId("redFlowers"), type: "flowerRed", distribution: defaultPerlinDistribution(0.16, (Date.now() + 31) % 10000) },
-    ],
-  };
-  contextMenu = null;
-  const parentPath = selection.kind === "area" ? selection.path : undefined;
-  const path = addAreaToLevel(area, parentPath);
-  selection = { kind: "area", path };
-  render();
-}
-
-function addBedArea(point: Point2): void {
-  const area: Area = {
-    id: uniqueId("flowerBed"),
-    kind: "area",
-    role: "bed",
-    shape: { type: "circle", center: point, radius: 1.4 },
-    vegetation: [{ id: uniqueId("tulipLayer"), type: "tulip", distribution: { type: "uniform", density: 0.35 } }],
-  };
+function addAreaBlueprint(key: string, point: Point2): void {
+  const blueprint = areaBlueprints.find((item) => item.key === key);
+  if (!blueprint) return;
+  const area = blueprint.create(point);
   contextMenu = null;
   const parentPath = selection.kind === "area" ? selection.path : undefined;
   const path = addAreaToLevel(area, parentPath);
