@@ -67,6 +67,7 @@ let pendingPath: PendingPathState = null;
 let contextMenu: ContextMenuState = null;
 let dragState: DragState = null;
 let editHandleDragState: EditHandleDragState = null;
+let activeViewportBounds: Rect | null = null;
 let treePanePx = 360;
 let sidebarCollapsed = false;
 let sidebarPanes = { tree: true, inspector: true, json: false };
@@ -1150,7 +1151,7 @@ function getBounds(level: LevelV1): Rect {
 function render(): void {
   const level = currentLevel();
   const validation = validateLevel(pack, level);
-  const bounds = getBounds(level);
+  const bounds = activeViewportBounds ?? getBounds(level);
   const exportValue = exportJsonValue();
   const allSidebarPanesCollapsed = !sidebarPanes.tree && !sidebarPanes.inspector && !sidebarPanes.json;
   const isSidebarCollapsed = sidebarCollapsed || allSidebarPanesCollapsed;
@@ -1391,6 +1392,8 @@ function wireGlobalActions(): void {
       contextMenu = null;
       pendingPath = null;
       dragState = null;
+      editHandleDragState = null;
+      activeViewportBounds = null;
       render();
     }
   };
@@ -1983,6 +1986,7 @@ function wireSvg(): void {
         last: world,
         moved: false,
       };
+      activeViewportBounds = getBounds(currentLevel());
       return;
     }
 
@@ -2009,6 +2013,7 @@ function wireSvg(): void {
     if (targetSelection) {
       selection = targetSelection;
       dragState = { selection: targetSelection, last: world, moved: false };
+      activeViewportBounds = getBounds(currentLevel());
       return;
     }
     selection = { kind: "level" };
@@ -2047,15 +2052,27 @@ function wireSvg(): void {
   svg.addEventListener("pointerup", () => {
     if (editHandleDragState) {
       editHandleDragState = null;
+      activeViewportBounds = null;
+      render();
       return;
     }
     if (dragState && !dragState.moved) {
       const clicked = dragState.selection;
       dragState = null;
+      activeViewportBounds = null;
       selectItem(clicked);
       return;
     }
     dragState = null;
+    activeViewportBounds = null;
+    render();
+  });
+
+  svg.addEventListener("pointercancel", () => {
+    dragState = null;
+    editHandleDragState = null;
+    activeViewportBounds = null;
+    render();
   });
 
   svg.addEventListener("contextmenu", (event) => {
