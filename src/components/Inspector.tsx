@@ -79,7 +79,11 @@ export function Inspector({ level, selection, onUpdateLevel, onUpdateArea, onDel
     );
   }
   if (selection.kind === "objects") {
-    return <Section title="Objects"><TextAreaField label="objects JSON" value={JSON.stringify(level.objects, null, 2)} onCommit={(value) => onUpdateLevel((current) => ({ ...current, objects: parseObjects(value, current.objects) }))} /></Section>;
+    return (
+      <Section title="Objects" action={level.objects.length > 0 ? <Button tone="danger" type="button" onClick={() => onUpdateLevel((current) => ({ ...current, objects: [] }))}>Clear</Button> : undefined}>
+        <div className="hint">Reserved in draft v1. Keep this empty until the object schema is defined.</div>
+      </Section>
+    );
   }
   return <Empty />;
 }
@@ -164,15 +168,6 @@ function parseCurves(value: string, fallback: { c1: [number, number]; c2: [numbe
     const parsed = JSON.parse(value) as unknown;
     if (!Array.isArray(parsed)) return fallback;
     return parsed.map((curve) => ({ c1: normalizePoint2((curve as { c1?: unknown }).c1, [0, 0]), c2: normalizePoint2((curve as { c2?: unknown }).c2, [0, 0]), end: normalizePoint2((curve as { end?: unknown }).end, [0, 0]) }));
-  } catch {
-    return fallback;
-  }
-}
-
-function parseObjects(value: string, fallback: unknown[]): unknown[] {
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? parsed : fallback;
   } catch {
     return fallback;
   }

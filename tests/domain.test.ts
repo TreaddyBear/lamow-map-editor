@@ -25,6 +25,26 @@ test("validates duplicate authored ids", () => {
   assert.ok(validateLevel(pack, level).some((error) => error.includes("Duplicate authored id")));
 });
 
+test("validates draft v1 authored id and object constraints", () => {
+  const pack = clone(defaultPack);
+  const level = pack.levels[0];
+  level.objects.push({ unsupported: true });
+  level.roads[0].id = "1badRoad";
+
+  const errors = validateLevel(pack, level);
+
+  assert.ok(errors.some((error) => error.includes("Objects are reserved")));
+  assert.ok(errors.some((error) => error.includes("id should start")));
+});
+
+test("validates polygon rules from the draft spec", () => {
+  const pack = clone(defaultPack);
+  const level = pack.levels[0];
+  level.areas[0].shape = { type: "polygon", points: [[0, 0], [2, 2], [0, 2], [2, 0]] };
+
+  assert.ok(validateLevel(pack, level).some((error) => error.includes("polygon edges must not cross")));
+});
+
 test("creates area blueprints with supplied ids and seeds", () => {
   let idIndex = 0;
   const area = createAreaFromBlueprint("flowers", [3, 4], (base) => `${base}${++idIndex}`, () => 42);
@@ -60,4 +80,18 @@ test("import/export accepts draft v1 packs", () => {
   assert.equal(result.pack.version, 1);
   assert.equal(result.pack.levels.length, exported.levels.length);
   assert.match(result.message, /draft v1 pack/);
+});
+
+test("normalization removes repeated final polygon points and clamps v1 scalars", () => {
+  const pack = clone(defaultPack);
+  pack.levels[0].areas[0].shape = { type: "polygon", points: [[0, 0], [1, 0], [1, 1], [0, 0]] };
+  pack.levels[0].areas[0].vegetation[0].distribution = { type: "uniform", density: -1 };
+  pack.levels[0].roads[0].width = -4;
+  const normalized = normalizePack(pack);
+  const shape = normalized.levels[0].areas[0].shape;
+
+  assert.equal(shape.type, "polygon");
+  if (shape.type === "polygon") assert.deepEqual(shape.points, [[0, 0], [1, 0], [1, 1]]);
+  assert.equal(normalized.levels[0].areas[0].vegetation[0].distribution.density, 0);
+  assert.equal(normalized.levels[0].roads[0].width, 0.1);
 });

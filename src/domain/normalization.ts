@@ -65,7 +65,12 @@ export function normalizeArea(area: Area): Area {
     ...area,
     kind: "area",
     id: area.id || "area",
+    composition: area.composition === "additive" ? "additive" : area.composition === "replace" ? "replace" : undefined,
+    role: area.role === "background" || area.role === "lawn" || area.role === "bed" ? area.role : undefined,
+    mowable: typeof area.mowable === "boolean" ? area.mowable : undefined,
+    surface: area.surface === "grass" || area.surface === "dirt" ? area.surface : undefined,
     shape: normalizeAreaShape(area.shape, { type: "rectangle", center: [0, 0], size: [4, 4] }),
+    edgeFalloff: area.edgeFalloff === undefined ? undefined : Math.max(0, finiteNumber(area.edgeFalloff, 0)),
     vegetation: (area.vegetation ?? []).map(normalizeVegetationLayer),
     children: area.children?.map(normalizeArea),
   };
@@ -80,15 +85,15 @@ export function normalizeVegetationLayer(layer: VegetationLayer): VegetationLaye
 }
 
 export function normalizeRoad(item: Road): Road {
-  return { ...item, kind: "road", id: item.id || "road", width: Number(item.width) || 3.2, shape: normalizePathShape(item.shape) };
+  return { ...item, kind: "road", id: item.id || "road", width: Math.max(0.1, finiteNumber(item.width, 3.2)), shape: normalizePathShape(item.shape) };
 }
 
 export function normalizeDirtPath(item: DirtPath): DirtPath {
-  return { ...item, kind: "dirtPath", id: item.id || "dirtPath", width: Number(item.width) || 1.1, shape: normalizePathShape(item.shape) };
+  return { ...item, kind: "dirtPath", id: item.id || "dirtPath", width: Math.max(0.1, finiteNumber(item.width, 1.1)), shape: normalizePathShape(item.shape) };
 }
 
 export function normalizeFence(item: Fence): Fence {
-  return { ...item, kind: "fence", id: item.id || "fence", height: Number(item.height) || 1, postSpacing: item.postSpacing, shape: normalizePathShape(item.shape) };
+  return { ...item, kind: "fence", id: item.id || "fence", height: Math.max(0.1, finiteNumber(item.height, 1)), postSpacing: item.postSpacing === undefined ? undefined : Math.max(0.1, finiteNumber(item.postSpacing, 2)), shape: normalizePathShape(item.shape) };
 }
 
 export function normalizeHeightFeature(item: HeightFeature): HeightFeature {
@@ -97,8 +102,8 @@ export function normalizeHeightFeature(item: HeightFeature): HeightFeature {
     type: "hill",
     id: item.id || "hill",
     shape: normalizeAreaShape(item.shape, { type: "circle", center: [0, 0], radius: 3 }),
-    height: Number(item.height) || 1,
-    falloff: Number(item.falloff) || 1,
+    height: finiteNumber(item.height, 1),
+    falloff: Math.max(0, finiteNumber(item.falloff, 1)),
   };
 }
 
@@ -110,7 +115,7 @@ export function normalizeDistribution(distribution: Distribution | unknown): Dis
       : [{ frequency: 0.4, weight: 1 }];
     return {
       type: "perlin",
-      density: finiteNumber(distribution.density, 1),
+      density: Math.max(0, finiteNumber(distribution.density, 1)),
       noise: {
         seed: finiteNumber(noise.seed, 1),
         octaves,
@@ -120,7 +125,7 @@ export function normalizeDistribution(distribution: Distribution | unknown): Dis
       },
     };
   }
-  return { type: "uniform", density: isRecord(distribution) ? finiteNumber(distribution.density, 1) : 1 };
+  return { type: "uniform", density: isRecord(distribution) ? Math.max(0, finiteNumber(distribution.density, 1)) : 1 };
 }
 
 export function normalizePoint2(value: unknown, fallback: Point2): Point2 {
@@ -135,13 +140,13 @@ export function normalizeAreaShape(value: unknown, fallback: AreaShape): AreaSha
     return { type: "circle", center: normalizePoint2(value.center, [0, 0]), radius: Math.max(0.1, Number(value.radius) || 1) };
   }
   if (value.type === "polygon") {
-    const points = Array.isArray(value.points) ? value.points.map((point) => normalizePoint2(point, [0, 0])) : [];
+    const points = dropRepeatedFinalPoint(Array.isArray(value.points) ? value.points.map((point) => normalizePoint2(point, [0, 0])) : []);
     return { type: "polygon", points: points.length >= 3 ? points : [[-2, -2], [2, -2], [0, 2]] };
   }
   return {
     type: "rectangle",
     center: normalizePoint2(value.center, [0, 0]),
-    size: normalizePoint2(value.size, [4, 4]),
+    size: positivePoint2(value.size, [4, 4]),
     rotationDegrees: value.rotationDegrees === undefined ? undefined : Number(value.rotationDegrees) || 0,
   };
 }
@@ -167,4 +172,16 @@ export function normalizePathShape(value: unknown): PathShape {
 
 function foliageType(value: unknown): FoliageType {
   return foliageRegistry.some((entry) => entry.key === value) ? (value as FoliageType) : "grass";
+}
+
+function positivePoint2(value: unknown, fallback: Point2): Point2 {
+  const point = normalizePoint2(value, fallback);
+  return [Math.max(0.1, Math.abs(point[0])), Math.max(0.1, Math.abs(point[1]))];
+}
+
+function dropRepeatedFinalPoint(points: Point2[]): Point2[] {
+  const first = points[0];
+  const last = points.at(-1);
+  if (first && last && first[0] === last[0] && first[1] === last[1]) return points.slice(0, -1);
+  return points;
 }
