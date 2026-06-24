@@ -8,7 +8,7 @@
 ## Phase 1: Modularize the Existing Editor
 
 - Split the current single-file editor into domain, state, geometry, import/export, viewport, inspector, sidebar, context menu, and wiring modules.
-  - Done so far: domain model, geometry, validation, normalization, import/export, blueprint definitions, and edit-handle mutation math.
+  - Done: `main.ts` has been replaced by React components and editor/domain modules. Remaining cleanup is reducer/action extraction from `App.tsx`.
 - Keep behavior stable during the first pass so later UI fixes are easier to isolate.
 - Prefer pure functions for map/domain operations and keep DOM rendering/wiring at the edge.
 - Add lightweight tests once pure modules exist.
@@ -45,7 +45,7 @@
 
 - Stop full rerenders from stealing focus, scroll, cursor, or text selection while typing.
 - Decouple JSON/import text from map state edits.
-  - Done for import/export logic: parsing/exporting is now a domain service. Remaining UI-local draft state will be cleaner after the import/export pane is split from `main.ts`.
+  - Done: import/export logic is a domain service and the React import/export pane owns its draft text.
 - Move state mutation through explicit editor actions so text edits can be local until committed.
 - Audit render calls and event wiring for unnecessary whole-app redraws.
 
@@ -55,3 +55,4 @@
   - Done: see `UI_MIGRATION_NOTES.md`.
 - Preserve the domain/import/export/geometry modules so a future UI rewrite does not restart the whole project.
 - Migrate incrementally by replacing one surface at a time: viewport, inspector, sidebar, import/export.
+  - Done: these surfaces are now React components.

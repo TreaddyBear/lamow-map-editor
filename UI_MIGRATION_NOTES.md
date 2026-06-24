@@ -1,6 +1,6 @@
 # UI Migration Notes
 
-The editor is still a DOM-string renderer, but the code is now closer to a future React or similar UI migration:
+The editor now uses React for the app shell, sidebar, inspector, viewport, context menu, and import/export pane.
 
 - Domain modules are independent of DOM rendering:
   - `src/domain/model.ts`
@@ -10,16 +10,14 @@ The editor is still a DOM-string renderer, but the code is now closer to a futur
   - `src/domain/importExport.ts`
   - `src/domain/blueprints.ts`
   - `src/domain/editHandles.ts`
-- The next migration boundary should be `src/main.ts`, split into:
+- The former `src/main.ts` renderer was replaced by a small `src/main.tsx` entry and split into:
   - editor state/actions
   - viewport rendering and pointer wiring
   - inspector rendering
   - sidebar rendering
   - context menu rendering
   - import/export pane rendering
-- A React migration should preserve the domain modules as-is and replace one surface at a time.
-- First React target: viewport component, because pointer/handle behavior is the highest-value interactive surface.
-- Second React target: inspector component, because local input state would solve the remaining focus/scroll friction more naturally than whole-app DOM replacement.
-- Third React target: sidebar and import/export panes.
+- The React migration preserved the domain modules as-is.
+- Next target: move the remaining state/action orchestration from `components/App.tsx` into `src/editor` reducer/action modules.
 
 Do not rewrite the map format or import/export behavior as part of the UI migration. Treat those as stable domain services.
