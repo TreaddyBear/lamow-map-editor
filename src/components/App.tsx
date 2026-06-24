@@ -11,6 +11,7 @@ import { ContextMenu } from "./ContextMenu";
 import { ImportExportPane } from "./ImportExportPane";
 import { Inspector } from "./Inspector";
 import { Sidebar } from "./Sidebar";
+import { SnapControls } from "./SnapControls";
 import { ActionRow, Button } from "./ui";
 import { Viewport } from "./Viewport";
 
@@ -25,9 +26,11 @@ export function App() {
     jsonText: "",
     importMessage: "",
     sidebarCollapsed: false,
-    sidebarPanes: { tree: true, inspector: true, blueprints: false, json: false },
+    importPanelOpen: false,
+    sidebarPanes: { tree: true, inspector: true, blueprints: false },
     pinnedAreaBlueprintKeys: [],
     activeViewportBounds: null,
+    snap: { enabled: false, increment: 1, mode: "toGrid" },
   }));
   const [history, setHistory] = useState<MapPackV1[]>([]);
 
@@ -130,7 +133,7 @@ export function App() {
   };
 
   return (
-    <main className={`app ${state.sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
+    <main className={`app ${state.sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${state.importPanelOpen ? "import-is-open" : ""}`}>
       <aside className={`panel sidebar-panel ${state.sidebarCollapsed ? "collapsed" : ""}`}>
         <div className="panel-header">
           <h1>LaMow Map Editor</h1>
@@ -151,7 +154,6 @@ export function App() {
           onDelete={deleteSelection}
           onAdd={addFromTree}
           inspector={<Inspector level={level} selection={state.selection} onUpdateLevel={updateLevel} onUpdateArea={updateArea} onDeleteSelection={() => deleteSelection()} />}
-          importExport={<ImportExportPane pack={state.pack} value={jsonValue} message={state.importMessage} onJsonText={(jsonText) => setState((current) => ({ ...current, jsonText }))} onCopy={() => navigator.clipboard.writeText(jsonValue).then(() => setState((current) => ({ ...current, importMessage: "Copied JSON to clipboard." })))} onImport={() => { try { const result = importJsonText(jsonValue); record((current) => ({ ...current, pack: normalizePack(result.pack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: result.message })); } catch (error) { setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON." })); } }} onOpenFile={(file) => file.text().then((text) => { const result = importJsonText(text); record((current) => ({ ...current, pack: normalizePack(result.pack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: result.message })); }).catch((error) => setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON file." })))} />}
         />
       </aside>
       <section className="panel canvas-panel">
@@ -159,13 +161,24 @@ export function App() {
           <h2>Top-down preview</h2>
           <ActionRow className="toolbar-actions">
             {(["select", "spawn", "area", "fence", "road", "dirtPath", "hill"] as CanvasTool[]).map((tool) => <Button key={tool} tone={state.canvasTool === tool ? "primary" : "default"} type="button" onClick={() => setState((current) => ({ ...current, canvasTool: tool, pendingPath: tool !== current.pendingPath?.kind ? null : current.pendingPath }))}>{tool === "dirtPath" ? "Path" : tool}</Button>)}
+            <Button type="button" tone={state.importPanelOpen ? "primary" : "default"} onClick={() => setState((current) => ({ ...current, importPanelOpen: !current.importPanelOpen }))}>Import / Export</Button>
           </ActionRow>
         </div>
         <div className="map-wrap">
-          <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater) => updateLevel(updater, false)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
+          <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
+          <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater) => updateLevel(updater, false)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
         </div>
         <div className="status">{validation.length === 0 ? <div className="ok">Draft v1 shape validates for the checks currently implemented.</div> : validation.map((error) => <div key={error} className="error">{error}</div>)}</div>
       </section>
+      {state.importPanelOpen ? (
+        <aside className="panel import-panel">
+          <div className="panel-header">
+            <h2>Import / Export</h2>
+            <Button type="button" onClick={() => setState((current) => ({ ...current, importPanelOpen: false }))}>Hide</Button>
+          </div>
+          <ImportExportPane pack={state.pack} value={jsonValue} message={state.importMessage} onJsonText={(jsonText) => setState((current) => ({ ...current, jsonText }))} onCopy={() => navigator.clipboard.writeText(jsonValue).then(() => setState((current) => ({ ...current, importMessage: "Copied JSON to clipboard." })))} onImport={() => { try { const result = importJsonText(jsonValue); record((current) => ({ ...current, pack: normalizePack(result.pack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: result.message })); } catch (error) { setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON." })); } }} onOpenFile={(file) => file.text().then((text) => { const result = importJsonText(text); record((current) => ({ ...current, pack: normalizePack(result.pack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: result.message })); }).catch((error) => setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON file." })))} />
+        </aside>
+      ) : null}
       <ContextMenu menu={state.contextMenu} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} onClose={() => setState((current) => ({ ...current, contextMenu: null }))} onSelect={(selection: Selection) => setState((current) => ({ ...current, selection, contextMenu: null }))} onDuplicate={duplicateSelection} onDelete={(selection) => deleteSelection(selection)} onMoveSpawn={() => state.contextMenu && updateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: state.contextMenu!.world } }))} onAddArea={() => state.contextMenu && addArea(state.contextMenu.world)} onAddChildArea={() => state.contextMenu && addArea(state.contextMenu.world, state.contextMenu.target?.kind === "area" ? state.contextMenu.target.path : state.selection.kind === "area" ? state.selection.path : undefined)} onAddBlueprint={(key) => state.contextMenu && addBlueprint(key, state.contextMenu.world)} onStartFence={() => state.contextMenu && pathToolClick("fence", state.contextMenu.world)} onAddRoad={() => state.contextMenu && addPathItem("road", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddDirtPath={() => state.contextMenu && addPathItem("dirtPath", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddHill={() => state.contextMenu && addHill(state.contextMenu.world)} />
     </main>
   );

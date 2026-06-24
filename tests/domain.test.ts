@@ -7,6 +7,7 @@ import { exportJsonValue, importJsonText } from "../src/domain/importExport";
 import { rectFromCenter, shapeBounds, translateShape } from "../src/domain/geometry";
 import { clone, defaultPack, type AreaShape } from "../src/domain/model";
 import { normalizePack } from "../src/domain/normalization";
+import { snapMoveDelta, snapPoint } from "../src/domain/snapping";
 import { validateLevel } from "../src/domain/validation";
 
 test("normalizes packs with a fallback level", () => {
@@ -94,4 +95,10 @@ test("normalization removes repeated final polygon points and clamps v1 scalars"
   if (shape.type === "polygon") assert.deepEqual(shape.points, [[0, 0], [1, 0], [1, 1]]);
   assert.equal(normalized.levels[0].areas[0].vegetation[0].distribution.density, 0);
   assert.equal(normalized.levels[0].roads[0].width, 0.1);
+});
+
+test("snapping supports grid targets and quantized movement", () => {
+  assert.deepEqual(snapPoint([1.24, 2.76], { enabled: true, increment: 0.5, mode: "toGrid" }), [1, 3]);
+  assert.deepEqual(snapMoveDelta([0.74, 1.26], [2.2, 2.2], { enabled: true, increment: 1, mode: "toGrid" }), [0.8, 0.8]);
+  assert.deepEqual(snapMoveDelta([0.74, 1.26], [2.2, 2.2], { enabled: true, increment: 1, mode: "byIncrement" }), [1, 1]);
 });

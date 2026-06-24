@@ -15,10 +15,9 @@ type Props = {
   onDelete: (selection: Selection) => void;
   onAdd: (kind: "level" | "area" | "road" | "dirtPath" | "fence" | "hill") => void;
   inspector: React.ReactNode;
-  importExport: React.ReactNode;
 };
 
-export function Sidebar({ level, selection, panes, pinnedAreaBlueprintKeys, onPaneToggle, onPinBlueprint, onSelect, onDelete, onAdd, inspector, importExport }: Props) {
+export function Sidebar({ level, selection, panes, pinnedAreaBlueprintKeys, onPaneToggle, onPinBlueprint, onSelect, onDelete, onAdd, inspector }: Props) {
   return (
     <div className="editor-sidebar">
       <details className="sidebar-pane" open={panes.tree} onToggle={(event) => onPaneToggle("tree", event.currentTarget.open)}>
@@ -57,10 +56,6 @@ export function Sidebar({ level, selection, panes, pinnedAreaBlueprintKeys, onPa
             <CheckboxField key={blueprint.key} label={`Pin ${blueprint.label.replace(" here", "")}`} checked={pinnedAreaBlueprintKeys.includes(blueprint.key)} onChange={(checked) => onPinBlueprint(blueprint.key, checked)} />
           ))}
         </div>
-      </details>
-      <details className="sidebar-pane" open={panes.json} onToggle={(event) => onPaneToggle("json", event.currentTarget.open)}>
-        <summary>Import / Export</summary>
-        {importExport}
       </details>
     </div>
   );

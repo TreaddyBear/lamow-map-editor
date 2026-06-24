@@ -4,7 +4,12 @@ export type SidebarPanes = {
   tree: boolean;
   inspector: boolean;
   blueprints: boolean;
-  json: boolean;
+};
+
+export type SnapSettings = {
+  enabled: boolean;
+  increment: number;
+  mode: "toGrid" | "byIncrement";
 };
 
 export type EditorState = {
@@ -17,9 +22,11 @@ export type EditorState = {
   jsonText: string;
   importMessage: string;
   sidebarCollapsed: boolean;
+  importPanelOpen: boolean;
   sidebarPanes: SidebarPanes;
   pinnedAreaBlueprintKeys: string[];
   activeViewportBounds: Rect | null;
+  snap: SnapSettings;
 };
 
 export type DragState = {

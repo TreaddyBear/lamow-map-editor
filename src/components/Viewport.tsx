@@ -2,6 +2,8 @@ import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactP
 import { moveAreaShapeHandle, movePathShapeHandle } from "../domain/editHandles";
 import type { LevelV1, Point2, Rect, Selection } from "../domain/model";
 import type { CanvasTool, PendingPathState } from "../domain/model";
+import { closestSelectionPoint, snapMoveDelta, snapPoint } from "../domain/snapping";
+import type { SnapSettings } from "../editor/types";
 import { moveSelection, round, sameSelection, updateArray, updateAreasAtPath } from "../editor/utils";
 import { AreaSvg, HillSvg, PathSvg } from "./viewport/MapObjects";
 import { SelectionHandles } from "./viewport/SelectionHandles";
@@ -10,6 +12,7 @@ import { applyLiveDrag, applySelectedGeometryPreview, clearLiveDrag } from "./vi
 type LiveDragState = {
   selection: Selection;
   start: Point2;
+  anchor: Point2 | null;
   last: Point2;
   dx: number;
   dz: number;
@@ -20,6 +23,7 @@ type LiveEditHandleDragState = {
   selection: Selection;
   handle: string;
   index?: number;
+  start: Point2;
   last: Point2;
   previewLevel: LevelV1;
   moved: boolean;
@@ -31,6 +35,7 @@ type Props = {
   selection: Selection;
   canvasTool: CanvasTool;
   pendingPath: PendingPathState;
+  snap: SnapSettings;
   onSelect: (selection: Selection) => void;
   onClearSelection: () => void;
   onUpdateLevel: (updater: (level: LevelV1) => LevelV1) => void;
@@ -79,25 +84,26 @@ export function Viewport(props: Props) {
         if (event.button !== 0) return;
         const world = eventToWorld(event.currentTarget, event);
         if (!world) return;
+        const snappedWorld = props.snap.enabled ? snapPoint(world, props.snap) : world;
         const handleElement = event.target instanceof Element ? event.target.closest("[data-handle]") as HTMLElement | null : null;
         if (handleElement) {
           event.currentTarget.setPointerCapture(event.pointerId);
-          liveEditHandleDragRef.current = { selection: structuredClone(props.selection), handle: handleElement.dataset.handle ?? "", index: handleElement.dataset.handleIndex === undefined ? undefined : Number(handleElement.dataset.handleIndex), last: world, previewLevel: structuredClone(level), moved: false };
+          liveEditHandleDragRef.current = { selection: structuredClone(props.selection), handle: handleElement.dataset.handle ?? "", index: handleElement.dataset.handleIndex === undefined ? undefined : Number(handleElement.dataset.handleIndex), start: world, last: props.snap.enabled ? snappedWorld : world, previewLevel: structuredClone(level), moved: false };
           props.onFreezeViewport();
           return;
         }
         if (props.canvasTool === "spawn") {
           props.onSelect({ kind: "spawn" });
-          props.onUpdateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: world } }));
+          props.onUpdateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: snappedWorld } }));
           return;
         }
-        if (props.canvasTool === "area") return props.onAddArea(world, props.selection.kind === "area" ? props.selection.path : undefined);
-        if (props.canvasTool === "hill") return props.onAddHill(world);
-        if (props.canvasTool === "fence" || props.canvasTool === "road" || props.canvasTool === "dirtPath") return props.onPathToolClick(props.canvasTool, world);
+        if (props.canvasTool === "area") return props.onAddArea(snappedWorld, props.selection.kind === "area" ? props.selection.path : undefined);
+        if (props.canvasTool === "hill") return props.onAddHill(snappedWorld);
+        if (props.canvasTool === "fence" || props.canvasTool === "road" || props.canvasTool === "dirtPath") return props.onPathToolClick(props.canvasTool, snappedWorld);
         const target = targetSelection(event.target);
         if (target) {
           props.onSelect(target);
-          liveDragRef.current = { selection: target, start: world, last: world, dx: 0, dz: 0, moved: false };
+          liveDragRef.current = { selection: target, start: world, anchor: closestSelectionPoint(level, target, world), last: world, dx: 0, dz: 0, moved: false };
           props.onFreezeViewport();
           return;
         }
@@ -108,18 +114,19 @@ export function Viewport(props: Props) {
         if (!world) return;
         if (liveEditHandleDragRef.current) {
           const drag = liveEditHandleDragRef.current;
-          const dx = round(world[0] - drag.last[0]);
-          const dz = round(world[1] - drag.last[1]);
+          const target = snapHandleTarget(world, drag.start, props.snap);
+          const dx = round(target[0] - drag.last[0]);
+          const dz = round(target[1] - drag.last[1]);
           if (dx === 0 && dz === 0) return;
-          const previewLevel = moveEditHandle(drag.previewLevel, drag.selection, drag.handle, drag.index, world, dx, dz);
-          liveEditHandleDragRef.current = { ...drag, last: world, previewLevel, moved: true };
+          const previewLevel = moveEditHandle(drag.previewLevel, drag.selection, drag.handle, drag.index, target, dx, dz);
+          liveEditHandleDragRef.current = { ...drag, last: target, previewLevel, moved: true };
           applySelectedGeometryPreview(event.currentTarget, previewLevel, drag.selection);
           return;
         }
         if (liveDragRef.current) {
           const drag = liveDragRef.current;
-          const dx = round(world[0] - drag.start[0]);
-          const dz = round(world[1] - drag.start[1]);
+          const rawDelta: Point2 = [round(world[0] - drag.start[0]), round(world[1] - drag.start[1])];
+          const [dx, dz] = snapMoveDelta(rawDelta, drag.anchor, props.snap);
           if (dx === drag.dx && dz === drag.dz) return;
           liveDragRef.current = { ...drag, last: world, dx, dz, moved: dx !== 0 || dz !== 0 };
           applyLiveDrag(event.currentTarget, drag.selection, dx, dz, dx !== 0 || dz !== 0);
@@ -170,6 +177,14 @@ export function Viewport(props: Props) {
       <SelectionHandles level={level} selection={props.selection} />
     </svg>
   );
+}
+
+function snapHandleTarget(world: Point2, start: Point2, snap: SnapSettings): Point2 {
+  if (!snap.enabled) return world;
+  if (snap.mode === "toGrid") return snapPoint(world, snap);
+  const rawDelta: Point2 = [round(world[0] - start[0]), round(world[1] - start[1])];
+  const delta = snapMoveDelta(rawDelta, null, snap);
+  return [round(start[0] + delta[0]), round(start[1] + delta[1])];
 }
 
 function moveEditHandle(level: LevelV1, item: Selection, handle: string, index: number | undefined, world: Point2, dx: number, dz: number): LevelV1 {
