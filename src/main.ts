@@ -3,15 +3,14 @@ import {
   normalizeRect,
   pathBounds,
   pathPoints,
-  rectContainsRect,
   rectFromCenter,
-  rectsOverlap,
   shapeBounds,
   translateArea,
   translatePathShape,
   translatePoint,
   translateShape,
 } from "./domain/geometry";
+import { collectAuthoredIds, validateLevel } from "./domain/validation";
 import {
   clone,
   defaultCoordinates,
@@ -130,6 +129,12 @@ function button(id: string, text: string, className = ""): string {
   return `<button id="${id}" class="${className}" type="button">${escapeText(text)}</button>`;
 }
 
+function actionButton(text: string, onClick: () => void, className = ""): string {
+  const id = crypto.randomUUID();
+  queueMicrotask(() => document.getElementById(id)?.addEventListener("click", onClick));
+  return button(id, text, className);
+}
+
 function disabledButton(text: string): string {
   return `<button type="button" disabled>${escapeText(text)}</button>`;
 }
@@ -138,7 +143,10 @@ function field(labelText: string, value: string | number, onInput: (value: strin
   const id = crypto.randomUUID();
   queueMicrotask(() => {
     const input = document.getElementById(id) as HTMLInputElement | null;
-    input?.addEventListener("input", () => onInput(input.value));
+    input?.addEventListener("change", () => onInput(input.value));
+    input?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") input.blur();
+    });
   });
   return `<label>${escapeText(labelText)}<input id="${id}" type="${type}" value="${escapeAttr(String(value))}" /></label>`;
 }
@@ -147,7 +155,7 @@ function textareaField(labelText: string, value: string, onInput: (value: string
   const id = crypto.randomUUID();
   queueMicrotask(() => {
     const input = document.getElementById(id) as HTMLTextAreaElement | null;
-    input?.addEventListener("input", () => onInput(input.value));
+    input?.addEventListener("change", () => onInput(input.value));
   });
   return `<label>${escapeText(labelText)}<textarea id="${id}" spellcheck="false">${escapeText(value)}</textarea></label>`;
 }
@@ -396,21 +404,6 @@ function uniqueId(base: string): string {
     if (!used.has(candidate.toLowerCase())) return candidate;
   }
   return `${safeBase}${Date.now()}`;
-}
-
-function collectAuthoredIds(level: LevelV1): string[] {
-  const ids: string[] = [];
-  const visitArea = (area: Area): void => {
-    ids.push(area.id);
-    area.vegetation.forEach((layer) => ids.push(layer.id));
-    area.children?.forEach(visitArea);
-  };
-  level.areas.forEach(visitArea);
-  level.roads.forEach((item) => ids.push(item.id));
-  level.dirtPaths.forEach((item) => ids.push(item.id));
-  level.fences.forEach((item) => ids.push(item.id));
-  level.terrain.heightFeatures.forEach((item) => ids.push(item.id));
-  return ids;
 }
 
 function exportJsonValue(): MapPackV1 {
@@ -892,7 +885,14 @@ function renderAreaShapeFields(shape: AreaShape, onChange: (shape: AreaShape) =>
     return `<div class="stack">${typeField}${point2Fields("center", shape.center, (center) => onChange({ ...shape, center }))}${field("radius", shape.radius, (value) => onChange({ ...shape, radius: numberValue(value, shape.radius) }), "number")}</div>`;
   }
   if (shape.type === "polygon") {
-    return `<div class="stack">${typeField}${textareaField("points", pointsText(shape.points), (value) => onChange({ ...shape, points: parsePoints(value, shape.points) }))}</div>`;
+    return `<div class="stack">
+      ${typeField}
+      <div class="json-actions">
+        ${actionButton("Add vertex", () => onChange({ ...shape, points: appendPoint(shape.points) }))}
+        ${shape.points.length > 3 ? actionButton("Remove last", () => onChange({ ...shape, points: shape.points.slice(0, -1) }), "danger") : disabledButton("Remove last")}
+      </div>
+      ${textareaField("points", pointsText(shape.points), (value) => onChange({ ...shape, points: parsePoints(value, shape.points) }))}
+    </div>`;
   }
   return `<div class="stack">
     ${typeField}
@@ -933,6 +933,12 @@ function parsePoints(value: string, fallback: Point2[]): Point2[] {
   return points.length >= 2 ? points : fallback;
 }
 
+function appendPoint(points: Point2[]): Point2[] {
+  const last = points.at(-1) ?? [0, 0];
+  const previous = points.at(-2) ?? [last[0] - 1, last[1]];
+  return [...points, [round(last[0] + (last[0] - previous[0] || 1)), round(last[1] + (last[1] - previous[1]))]];
+}
+
 function renderPathItemInspector(kind: "road" | "dirtPath", item: Road | DirtPath, index: number): string {
   return `<div class="section">
     <div class="section-title"><h3>${kind === "road" ? "Road" : "Dirt path"} ${escapeText(item.id)}</h3>${button("delete-selected", "Delete", "danger")}</div>
@@ -970,8 +976,27 @@ function renderPathShapeFields(shape: PathShape, onChange: (shape: PathShape) =>
     (value) => onChange(convertPathShape(shape, value as PathShape["type"])),
   );
 
-  if (shape.type === "polyline") return `<div class="stack">${typeField}${textareaField("points", pointsText(shape.points), (value) => onChange({ ...shape, points: parsePoints(value, shape.points) }))}</div>`;
-  if (shape.type === "cubicBezierPath") return `<div class="stack">${typeField}${point2Fields("start", shape.start, (start) => onChange({ ...shape, start }))}${textareaField("curves JSON", JSON.stringify(shape.curves), (value) => onChange({ ...shape, curves: parseCurves(value, shape.curves) }))}</div>`;
+  if (shape.type === "polyline") {
+    return `<div class="stack">
+      ${typeField}
+      <div class="json-actions">
+        ${actionButton("Add point", () => onChange({ ...shape, points: appendPoint(shape.points) }))}
+        ${shape.points.length > 2 ? actionButton("Remove last", () => onChange({ ...shape, points: shape.points.slice(0, -1) }), "danger") : disabledButton("Remove last")}
+      </div>
+      ${textareaField("points", pointsText(shape.points), (value) => onChange({ ...shape, points: parsePoints(value, shape.points) }))}
+    </div>`;
+  }
+  if (shape.type === "cubicBezierPath") {
+    return `<div class="stack">
+      ${typeField}
+      ${point2Fields("start", shape.start, (start) => onChange({ ...shape, start }))}
+      <div class="json-actions">
+        ${actionButton("Add curve", () => onChange({ ...shape, curves: appendCurve(shape) }))}
+        ${shape.curves.length > 1 ? actionButton("Remove last", () => onChange({ ...shape, curves: shape.curves.slice(0, -1) }), "danger") : disabledButton("Remove last")}
+      </div>
+      ${textareaField("curves JSON", JSON.stringify(shape.curves), (value) => onChange({ ...shape, curves: parseCurves(value, shape.curves) }))}
+    </div>`;
+  }
   return `<div class="stack">${typeField}${point2Fields("start", shape.start, (start) => onChange({ ...shape, start }))}${point2Fields("end", shape.end, (end) => onChange({ ...shape, end }))}</div>`;
 }
 
@@ -982,6 +1007,15 @@ function convertPathShape(shape: PathShape, type: PathShape["type"]): PathShape 
   if (type === "polyline") return { type: "polyline", points: points.length >= 2 ? points : [start, end] };
   if (type === "cubicBezierPath") return { type: "cubicBezierPath", start, curves: [{ c1: start, c2: end, end }] };
   return { type: "line", start, end };
+}
+
+function appendCurve(shape: Extract<PathShape, { type: "cubicBezierPath" }>): { c1: Point2; c2: Point2; end: Point2 }[] {
+  const last = shape.curves.at(-1);
+  const start = last?.end ?? shape.start;
+  const c1: Point2 = [round(start[0] + 1), start[1]];
+  const c2: Point2 = [round(start[0] + 2), start[1]];
+  const end: Point2 = [round(start[0] + 3), start[1]];
+  return [...shape.curves, { c1, c2, end }];
 }
 
 function parseCurves(value: string, fallback: { c1: Point2; c2: Point2; end: Point2 }[]): { c1: Point2; c2: Point2; end: Point2 }[] {
@@ -1345,62 +1379,6 @@ function renderPathSvg(shape: PathShape, item: Selection, color: string, width: 
   return `<path ${attrs} d="${d}" />`;
 }
 
-function validateLevel(currentPack: MapPackV1, level: LevelV1): string[] {
-  const errors: string[] = [];
-  if (!currentPack.pack.prefix.trim()) errors.push("Pack prefix is required.");
-  if (!/^[A-Za-z]/.test(currentPack.pack.prefix)) errors.push("Pack prefix should start with a simple Latin alphabetic character.");
-  if (!level.code.trim()) errors.push("Level code is required.");
-  if (!/^[A-Za-z]/.test(level.code)) errors.push("Level code should start with a simple Latin alphabetic character.");
-  if (!level.name.trim()) errors.push("Level name is required.");
-  if (level.parSeconds <= 0) errors.push("Par seconds must be greater than 0.");
-  if (level.areas.length === 0) errors.push("Add at least one area.");
-
-  const matchingCodes = currentPack.levels.filter((item) => item.code.toLowerCase() === level.code.toLowerCase());
-  if (matchingCodes.length > 1) errors.push(`Level code ${level.code} appears more than once in this pack.`);
-
-  const idCounts = new Map<string, number>();
-  collectAuthoredIds(level).forEach((id) => idCounts.set(id.toLowerCase(), (idCounts.get(id.toLowerCase()) ?? 0) + 1));
-  [...idCounts.entries()].forEach(([id, count]) => {
-    if (count > 1) errors.push(`Duplicate authored id in level: ${id}.`);
-  });
-
-  const visitArea = (area: Area, path: number[], parent?: Area): void => {
-    if (!area.id.trim()) errors.push(`Area ${pathKey(path)} needs an id.`);
-    validateAreaShape(area.shape, `Area ${area.id}`, errors);
-    if (parent && !rectContainsRect(shapeBounds(parent.shape), shapeBounds(area.shape))) {
-      errors.push(`Area ${area.id} may extend outside parent ${parent.id}.`);
-    }
-    const children = area.children ?? [];
-    children.forEach((child, index) => visitArea(child, [...path, index], area));
-    children.forEach((child, index) => {
-      children.slice(index + 1).forEach((sibling) => {
-        if (rectsOverlap(shapeBounds(child.shape), shapeBounds(sibling.shape))) {
-          errors.push(`Sibling areas ${child.id} and ${sibling.id} overlap by bounds.`);
-        }
-      });
-    });
-  };
-  level.areas.forEach((area, index) => visitArea(area, [index]));
-
-  level.roads.forEach((road) => validatePathShape(road.shape, `Road ${road.id}`, errors));
-  level.dirtPaths.forEach((path) => validatePathShape(path.shape, `Dirt path ${path.id}`, errors));
-  level.fences.forEach((fence) => validatePathShape(fence.shape, `Fence ${fence.id}`, errors));
-  level.terrain.heightFeatures.forEach((hill) => validateAreaShape(hill.shape, `Hill ${hill.id}`, errors));
-
-  return errors;
-}
-
-function validateAreaShape(shape: AreaShape, label: string, errors: string[]): void {
-  if (shape.type === "rectangle" && (shape.size[0] <= 0 || shape.size[1] <= 0)) errors.push(`${label} rectangle needs positive size.`);
-  if (shape.type === "circle" && shape.radius <= 0) errors.push(`${label} circle needs positive radius.`);
-  if (shape.type === "polygon" && shape.points.length < 3) errors.push(`${label} polygon needs at least three points.`);
-}
-
-function validatePathShape(shape: PathShape, label: string, errors: string[]): void {
-  if (shape.type === "polyline" && shape.points.length < 2) errors.push(`${label} polyline needs at least two points.`);
-  if (shape.type === "cubicBezierPath" && shape.curves.length === 0) errors.push(`${label} Bezier path needs at least one curve.`);
-}
-
 function wireGlobalActions(): void {
   document.onkeydown = (event) => {
     const target = event.target as HTMLElement | null;
@@ -1521,9 +1499,10 @@ function wireButtons(): void {
 function wireSidebarPane(name: keyof typeof sidebarPanes, id: string): void {
   const pane = document.getElementById(id) as HTMLDetailsElement | null;
   pane?.addEventListener("toggle", () => {
-    sidebarPanes = { ...sidebarPanes, [name]: pane.open };
+    const nextPanes = { ...sidebarPanes, [name]: pane.open };
+    sidebarPanes = nextPanes;
     sidebarCollapsed = false;
-    if (!sidebarPanes.tree && !sidebarPanes.inspector && !sidebarPanes.json) render();
+    if (!nextPanes.tree && !nextPanes.inspector && !nextPanes.json) render();
   });
 }
 
