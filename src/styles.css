@@ -537,15 +537,42 @@ label {
   z-index: 4;
   top: 1.7rem;
   left: 1.7rem;
+}
+
+.snap-toggle {
+  width: 2.45rem;
+  height: 2.45rem;
   display: grid;
-  grid-template-columns: auto minmax(8rem, 10rem) minmax(5rem, 7rem);
-  align-items: end;
+  place-items: center;
+  border: 1px solid #9eaaa0;
+  border-radius: 8px;
+  background: rgb(248 251 246 / 94%);
+  color: #6a7469;
+  box-shadow: 0 8px 22px rgb(31 49 27 / 12%);
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0;
+}
+
+.snap-widget.active .snap-toggle {
+  border-color: #2f6f34;
+  background: #2f6f34;
+  color: #ffffff;
+}
+
+.snap-popover {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  width: 13rem;
+  display: grid;
   gap: 0.55rem;
   border: 1px solid #b8c9b2;
   border-radius: 8px;
-  background: rgb(248 251 246 / 94%);
-  box-shadow: 0 8px 22px rgb(31 49 27 / 12%);
-  padding: 0.55rem;
+  background: rgb(248 251 246 / 97%);
+  box-shadow: 0 12px 30px rgb(31 49 27 / 16%);
+  padding: 0.65rem;
 }
 
 .zoom-widget {
@@ -597,12 +624,12 @@ label {
   pointer-events: none;
 }
 
-.snap-widget label {
+.snap-popover label {
   font-size: 0.68rem;
 }
 
-.snap-widget input,
-.snap-widget select {
+.snap-popover input,
+.snap-popover select {
   padding-block: 0.35rem;
 }
 
