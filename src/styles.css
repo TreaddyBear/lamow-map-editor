@@ -434,6 +434,15 @@ label {
   margin-left: 0.75rem;
 }
 
+.context-label {
+  color: #61715d;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  margin: 0.15rem 0 0.05rem 0.75rem;
+  text-transform: uppercase;
+}
+
 .context-divider {
   height: 1px;
   background: #dbe8d5;

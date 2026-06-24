@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { createAreaFromBlueprint } from "../src/domain/blueprints";
 import { moveAreaShapeHandle } from "../src/domain/editHandles";
+import { exportJsonValue, importJsonText } from "../src/domain/importExport";
 import { rectFromCenter, shapeBounds, translateShape } from "../src/domain/geometry";
 import { clone, defaultPack, type AreaShape } from "../src/domain/model";
 import { normalizePack } from "../src/domain/normalization";
@@ -50,4 +51,13 @@ test("rectangle rotation handles update rotation degrees", () => {
 
   assert.equal(rotated.type, "rectangle");
   assert.equal(rotated.rotationDegrees, 90);
+});
+
+test("import/export accepts draft v1 packs", () => {
+  const exported = exportJsonValue(clone(defaultPack));
+  const result = importJsonText(JSON.stringify(exported));
+
+  assert.equal(result.pack.version, 1);
+  assert.equal(result.pack.levels.length, exported.levels.length);
+  assert.match(result.message, /draft v1 pack/);
 });
