@@ -3,6 +3,7 @@ import { normalizeDistribution, normalizePoint2 } from "../domain/normalization"
 import { shapeBounds, pathPoints } from "../domain/geometry";
 import { appendCurve, appendPoint, getAreaByPath, numberValue, parseDistributionOctaves, parsePoints, parseTags, pointsText, tagsText, updateArray } from "../editor/utils";
 import { Field, Point2Fields, Section, SelectField, TextAreaField } from "./formControls";
+import { ActionRow, Button } from "./ui";
 
 type Props = {
   level: LevelV1;
@@ -35,7 +36,7 @@ export function Inspector({ level, selection, onUpdateLevel, onUpdateArea, onDel
     const area = getAreaByPath(level.areas, selection.path);
     if (!area) return <Empty />;
     return (
-      <Section title={`Area ${area.id}`} action={<button className="danger" type="button" onClick={onDeleteSelection}>Delete</button>}>
+      <Section title={`Area ${area.id}`} action={<Button tone="danger" type="button" onClick={onDeleteSelection}>Delete</Button>}>
         <AuthoredFields item={area} onChange={(next) => onUpdateArea(selection.path!, (current) => ({ ...current, ...next }))} />
         <SelectField label="composition" value={area.composition ?? "replace"} options={[{ value: "replace", label: "replace" }, { value: "additive", label: "additive" }]} onChange={(value) => onUpdateArea(selection.path!, (current) => ({ ...current, composition: value as Area["composition"] }))} />
         <SelectField label="role" value={area.role ?? ""} options={[{ value: "", label: "none" }, { value: "background", label: "background" }, { value: "lawn", label: "lawn" }, { value: "bed", label: "bed" }]} onChange={(value) => onUpdateArea(selection.path!, (current) => ({ ...current, role: (value || undefined) as Area["role"] }))} />
@@ -48,7 +49,7 @@ export function Inspector({ level, selection, onUpdateLevel, onUpdateArea, onDel
     const layer = area?.vegetation[selection.vegetationIndex];
     if (!area || !layer) return <Empty />;
     return (
-      <Section title={`Vegetation ${layer.id}`} action={<button className="danger" type="button" onClick={onDeleteSelection}>Delete</button>}>
+      <Section title={`Vegetation ${layer.id}`} action={<Button tone="danger" type="button" onClick={onDeleteSelection}>Delete</Button>}>
         <Field label="id" value={layer.id} onCommit={(value) => onUpdateArea(selection.path!, (current) => ({ ...current, vegetation: updateArray(current.vegetation, selection.vegetationIndex!, { ...layer, id: value }) }))} />
         <SelectField label="type" value={layer.type} options={foliageRegistry.map((entry) => ({ value: entry.key, label: `${entry.label} (${entry.category})` }))} onChange={(value) => onUpdateArea(selection.path!, (current) => ({ ...current, vegetation: updateArray(current.vegetation, selection.vegetationIndex!, { ...layer, type: value as FoliageType }) }))} />
         <DistributionFields distribution={layer.distribution} onChange={(distribution) => onUpdateArea(selection.path!, (current) => ({ ...current, vegetation: updateArray(current.vegetation, selection.vegetationIndex!, { ...layer, distribution }) }))} />
@@ -60,7 +61,7 @@ export function Inspector({ level, selection, onUpdateLevel, onUpdateArea, onDel
   if (selection.kind === "fence" && selection.index !== undefined && level.fences[selection.index]) {
     const fence = level.fences[selection.index];
     return (
-      <Section title={`Fence ${fence.id}`} action={<button className="danger" type="button" onClick={onDeleteSelection}>Delete</button>}>
+      <Section title={`Fence ${fence.id}`} action={<Button tone="danger" type="button" onClick={onDeleteSelection}>Delete</Button>}>
         <AuthoredFields item={fence} onChange={(next) => onUpdateLevel((current) => ({ ...current, fences: updateArray(current.fences, selection.index!, { ...fence, ...next }) }))} />
         <Field label="height" type="number" value={fence.height} onCommit={(value) => onUpdateLevel((current) => ({ ...current, fences: updateArray(current.fences, selection.index!, { ...fence, height: numberValue(value, fence.height) }) }))} />
         <PathShapeFields shape={fence.shape} onChange={(shape) => onUpdateLevel((current) => ({ ...current, fences: updateArray(current.fences, selection.index!, { ...fence, shape }) }))} />
@@ -70,7 +71,7 @@ export function Inspector({ level, selection, onUpdateLevel, onUpdateArea, onDel
   if (selection.kind === "heightFeature" && selection.index !== undefined && level.terrain.heightFeatures[selection.index]) {
     const hill = level.terrain.heightFeatures[selection.index];
     return (
-      <Section title={`Hill ${hill.id}`} action={<button className="danger" type="button" onClick={onDeleteSelection}>Delete</button>}>
+      <Section title={`Hill ${hill.id}`} action={<Button tone="danger" type="button" onClick={onDeleteSelection}>Delete</Button>}>
         <AuthoredFields item={hill} onChange={(next) => onUpdateLevel((current) => ({ ...current, terrain: { heightFeatures: updateArray(current.terrain.heightFeatures, selection.index!, { ...hill, ...next }) } }))} />
         <Field label="height" type="number" value={hill.height} onCommit={(value) => onUpdateLevel((current) => ({ ...current, terrain: { heightFeatures: updateArray(current.terrain.heightFeatures, selection.index!, { ...hill, height: numberValue(value, hill.height) }) } }))} />
         <ShapeFields shape={hill.shape} onChange={(shape) => onUpdateLevel((current) => ({ ...current, terrain: { heightFeatures: updateArray(current.terrain.heightFeatures, selection.index!, { ...hill, shape }) } }))} />
@@ -103,14 +104,14 @@ function ShapeFields({ shape, onChange }: { shape: AreaShape; onChange: (shape: 
       <SelectField label="shape" value={shape.type} options={[{ value: "rectangle", label: "rectangle" }, { value: "circle", label: "circle" }, { value: "polygon", label: "polygon" }]} onChange={(value) => onChange(convertAreaShape(shape, value as AreaShape["type"]))} />
       {shape.type === "circle" ? <><Point2Fields label="center" point={shape.center} onChange={(center) => onChange({ ...shape, center })} /><Field label="radius" type="number" value={shape.radius} onCommit={(value) => onChange({ ...shape, radius: numberValue(value, shape.radius) })} /></> : null}
       {shape.type === "rectangle" ? <><Point2Fields label="center" point={shape.center} onChange={(center) => onChange({ ...shape, center })} /><Point2Fields label="size" point={shape.size} onChange={(size) => onChange({ ...shape, size })} /><Field label="rotation degrees" type="number" value={shape.rotationDegrees ?? 0} onCommit={(value) => onChange({ ...shape, rotationDegrees: numberValue(value, shape.rotationDegrees ?? 0) })} /></> : null}
-      {shape.type === "polygon" ? <><div className="json-actions"><button type="button" onClick={() => onChange({ ...shape, points: appendPoint(shape.points) })}>Add vertex</button><button className="danger" disabled={shape.points.length <= 3} type="button" onClick={() => onChange({ ...shape, points: shape.points.slice(0, -1) })}>Remove last</button></div><TextAreaField label="points" value={pointsText(shape.points)} onCommit={(value) => onChange({ ...shape, points: parsePoints(value, shape.points) })} /></> : null}
+      {shape.type === "polygon" ? <><ActionRow><Button type="button" onClick={() => onChange({ ...shape, points: appendPoint(shape.points) })}>Add vertex</Button><Button tone="danger" disabled={shape.points.length <= 3} type="button" onClick={() => onChange({ ...shape, points: shape.points.slice(0, -1) })}>Remove last</Button></ActionRow><TextAreaField label="points" value={pointsText(shape.points)} onCommit={(value) => onChange({ ...shape, points: parsePoints(value, shape.points) })} /></> : null}
     </>
   );
 }
 
 function PathItem({ title, item, onChange, onDelete }: { title: string; item: Road | DirtPath; onChange: (item: Road | DirtPath) => void; onDelete: () => void }) {
   return (
-    <Section title={`${title} ${item.id}`} action={<button className="danger" type="button" onClick={onDelete}>Delete</button>}>
+    <Section title={`${title} ${item.id}`} action={<Button tone="danger" type="button" onClick={onDelete}>Delete</Button>}>
       <AuthoredFields item={item} onChange={(next) => onChange({ ...item, ...next })} />
       <Field label="width" type="number" value={item.width} onCommit={(value) => onChange({ ...item, width: numberValue(value, item.width) })} />
       <PathShapeFields shape={item.shape} onChange={(shape) => onChange({ ...item, shape })} />
@@ -123,8 +124,8 @@ function PathShapeFields({ shape, onChange }: { shape: PathShape; onChange: (sha
     <>
       <SelectField label="shape" value={shape.type} options={[{ value: "line", label: "line" }, { value: "polyline", label: "polyline" }, { value: "cubicBezierPath", label: "cubicBezierPath" }]} onChange={(value) => onChange(convertPathShape(shape, value as PathShape["type"]))} />
       {shape.type === "line" ? <><Point2Fields label="start" point={shape.start} onChange={(start) => onChange({ ...shape, start })} /><Point2Fields label="end" point={shape.end} onChange={(end) => onChange({ ...shape, end })} /></> : null}
-      {shape.type === "polyline" ? <><div className="json-actions"><button type="button" onClick={() => onChange({ ...shape, points: appendPoint(shape.points) })}>Add point</button><button className="danger" disabled={shape.points.length <= 2} type="button" onClick={() => onChange({ ...shape, points: shape.points.slice(0, -1) })}>Remove last</button></div><TextAreaField label="points" value={pointsText(shape.points)} onCommit={(value) => onChange({ ...shape, points: parsePoints(value, shape.points) })} /></> : null}
-      {shape.type === "cubicBezierPath" ? <><Point2Fields label="start" point={shape.start} onChange={(start) => onChange({ ...shape, start })} /><div className="json-actions"><button type="button" onClick={() => onChange({ ...shape, curves: appendCurve(shape) })}>Add curve</button><button className="danger" disabled={shape.curves.length <= 1} type="button" onClick={() => onChange({ ...shape, curves: shape.curves.slice(0, -1) })}>Remove last</button></div><TextAreaField label="curves JSON" value={JSON.stringify(shape.curves)} onCommit={(value) => onChange({ ...shape, curves: parseCurves(value, shape.curves) })} /></> : null}
+      {shape.type === "polyline" ? <><ActionRow><Button type="button" onClick={() => onChange({ ...shape, points: appendPoint(shape.points) })}>Add point</Button><Button tone="danger" disabled={shape.points.length <= 2} type="button" onClick={() => onChange({ ...shape, points: shape.points.slice(0, -1) })}>Remove last</Button></ActionRow><TextAreaField label="points" value={pointsText(shape.points)} onCommit={(value) => onChange({ ...shape, points: parsePoints(value, shape.points) })} /></> : null}
+      {shape.type === "cubicBezierPath" ? <><Point2Fields label="start" point={shape.start} onChange={(start) => onChange({ ...shape, start })} /><ActionRow><Button type="button" onClick={() => onChange({ ...shape, curves: appendCurve(shape) })}>Add curve</Button><Button tone="danger" disabled={shape.curves.length <= 1} type="button" onClick={() => onChange({ ...shape, curves: shape.curves.slice(0, -1) })}>Remove last</Button></ActionRow><TextAreaField label="curves JSON" value={JSON.stringify(shape.curves)} onCommit={(value) => onChange({ ...shape, curves: parseCurves(value, shape.curves) })} /></> : null}
     </>
   );
 }

@@ -11,6 +11,7 @@ import { ContextMenu } from "./ContextMenu";
 import { ImportExportPane } from "./ImportExportPane";
 import { Inspector } from "./Inspector";
 import { Sidebar } from "./Sidebar";
+import { ActionRow, Button } from "./ui";
 import { Viewport } from "./Viewport";
 
 export function App() {
@@ -133,11 +134,11 @@ export function App() {
       <aside className={`panel sidebar-panel ${state.sidebarCollapsed ? "collapsed" : ""}`}>
         <div className="panel-header">
           <h1>LaMow Map Editor</h1>
-          <div className="json-actions">
-            <button type="button" onClick={() => setState((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }))}>{state.sidebarCollapsed ? "Show" : "Hide"}</button>
-            <button type="button" disabled={history.length === 0} onClick={() => { const previous = history.at(-1); if (previous) { setHistory((items) => items.slice(0, -1)); setState((current) => ({ ...current, pack: previous, selection: { kind: "level" }, importMessage: "Undid last edit." })); } }}>Undo</button>
-            <button type="button" onClick={() => record((current) => ({ ...current, pack: clone(defaultPack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: "" }))}>Reset</button>
-          </div>
+          <ActionRow>
+            <Button type="button" onClick={() => setState((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }))}>{state.sidebarCollapsed ? "Show" : "Hide"}</Button>
+            <Button type="button" disabled={history.length === 0} onClick={() => { const previous = history.at(-1); if (previous) { setHistory((items) => items.slice(0, -1)); setState((current) => ({ ...current, pack: previous, selection: { kind: "level" }, importMessage: "Undid last edit." })); } }}>Undo</Button>
+            <Button type="button" onClick={() => record((current) => ({ ...current, pack: clone(defaultPack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: "" }))}>Reset</Button>
+          </ActionRow>
         </div>
         <Sidebar
           level={level}
@@ -156,9 +157,9 @@ export function App() {
       <section className="panel canvas-panel">
         <div className="panel-header">
           <h2>Top-down preview</h2>
-          <div className="json-actions toolbar-actions">
-            {(["select", "spawn", "area", "fence", "road", "dirtPath", "hill"] as CanvasTool[]).map((tool) => <button key={tool} className={state.canvasTool === tool ? "primary" : ""} type="button" onClick={() => setState((current) => ({ ...current, canvasTool: tool, pendingPath: tool !== current.pendingPath?.kind ? null : current.pendingPath }))}>{tool === "dirtPath" ? "Path" : tool}</button>)}
-          </div>
+          <ActionRow className="toolbar-actions">
+            {(["select", "spawn", "area", "fence", "road", "dirtPath", "hill"] as CanvasTool[]).map((tool) => <Button key={tool} tone={state.canvasTool === tool ? "primary" : "default"} type="button" onClick={() => setState((current) => ({ ...current, canvasTool: tool, pendingPath: tool !== current.pendingPath?.kind ? null : current.pendingPath }))}>{tool === "dirtPath" ? "Path" : tool}</Button>)}
+          </ActionRow>
         </div>
         <div className="map-wrap">
           <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} dragState={dragState} editHandleDragState={editHandleDragState} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater) => updateLevel(updater, false)} onDragState={setDragState} onEditHandleDragState={setEditHandleDragState} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
