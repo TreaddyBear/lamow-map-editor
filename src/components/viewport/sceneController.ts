@@ -29,14 +29,21 @@ export function applySelectedGeometryPreview(svg: SVGSVGElement, level: LevelV1,
 export function renderHandlePreview(svg: SVGSVGElement, level: LevelV1, selection: Selection) {
   const handles = svg.querySelector<SVGGElement>(".edit-handles");
   if (!handles) return;
+  renderHandlesInto(handles, level, selection);
+}
+
+export function renderHandlesInto(handles: SVGGElement, level: LevelV1, selection: Selection) {
+  const svg = handles.ownerSVGElement;
+  if (!svg) return;
+  const scale = handleScale(svg);
   handles.replaceChildren(...selectionHandlePrimitives(level, selection).map((primitive) => {
     if (primitive.kind === "guide") {
       return svgElement("line", { class: "edit-handle-guide", x1: primitive.start[0], y1: primitive.start[1], x2: primitive.end[0], y2: primitive.end[1] });
     }
     const group = svgElement("g", { class: "edit-handle-node", "data-handle": primitive.handle, "data-handle-index": primitive.index });
     group.append(
-      svgElement("circle", { class: "edit-handle-hit", cx: primitive.point[0], cy: primitive.point[1], r: primitive.anchor ? 0.42 : 0.36 }),
-      svgElement("circle", { class: `edit-handle ${primitive.anchor ? "anchor" : ""}`, cx: primitive.point[0], cy: primitive.point[1], r: primitive.anchor ? 0.2 : 0.16 }),
+      svgElement("circle", { class: "edit-handle-hit", cx: primitive.point[0], cy: primitive.point[1], r: (primitive.anchor ? 11 : 9) * scale }),
+      svgElement("circle", { class: `edit-handle ${primitive.anchor ? "anchor" : ""}`, cx: primitive.point[0], cy: primitive.point[1], r: (primitive.anchor ? 5.5 : 4.5) * scale }),
     );
     return group;
   }));
@@ -133,4 +140,10 @@ function svgElement<K extends keyof SVGElementTagNameMap>(tagName: K, attrs: Rec
     if (value !== undefined) element.setAttribute(key, String(value));
   }
   return element;
+}
+
+function handleScale(svg: SVGSVGElement): number {
+  const viewBox = svg.viewBox.baseVal;
+  const width = svg.clientWidth || 1;
+  return Math.max(0.001, viewBox.width / width);
 }

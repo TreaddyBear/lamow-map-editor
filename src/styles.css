@@ -368,6 +368,14 @@ label {
   cursor: grab;
 }
 
+.map-board {
+  cursor: default;
+}
+
+.map-board:active {
+  cursor: grabbing;
+}
+
 .map-object:active {
   cursor: grabbing;
 }
@@ -434,22 +442,6 @@ label {
   background: #edf6e9;
 }
 
-.context-submenu {
-  display: grid;
-  gap: 0.15rem;
-}
-
-.context-submenu summary {
-  cursor: pointer;
-  font-weight: 800;
-  padding: 0.45rem 0.6rem;
-  list-style-position: inside;
-}
-
-.context-submenu button {
-  margin-left: 0.75rem;
-}
-
 .context-label {
   color: #61715d;
   font-size: 0.68rem;
@@ -457,6 +449,39 @@ label {
   letter-spacing: 0.04em;
   margin: 0.15rem 0 0.05rem 0.75rem;
   text-transform: uppercase;
+}
+
+.context-popout-row {
+  position: relative;
+}
+
+.context-popout-row > button {
+  width: 100%;
+}
+
+.context-popout-row > button::after {
+  content: ">";
+  float: right;
+}
+
+.context-popout {
+  position: absolute;
+  left: calc(100% + 0.35rem);
+  top: -0.35rem;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 14rem;
+  max-height: min(28rem, calc(100vh - 2rem));
+  overflow: auto;
+  border: 1px solid #9eb397;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgb(31 49 27 / 18%);
+  padding: 0.35rem;
+}
+
+.context-popout button {
+  margin-left: 0;
 }
 
 .context-divider {
@@ -521,6 +546,55 @@ label {
   background: rgb(248 251 246 / 94%);
   box-shadow: 0 8px 22px rgb(31 49 27 / 12%);
   padding: 0.55rem;
+}
+
+.zoom-widget {
+  position: absolute;
+  z-index: 4;
+  top: 1.7rem;
+  left: min(31rem, calc(100% - 13rem));
+  display: flex;
+  gap: 0.35rem;
+  border: 1px solid #b8c9b2;
+  border-radius: 8px;
+  background: rgb(248 251 246 / 94%);
+  box-shadow: 0 8px 22px rgb(31 49 27 / 12%);
+  padding: 0.35rem;
+}
+
+.zoom-widget button {
+  min-width: 2.25rem;
+  padding: 0.38rem 0.5rem;
+}
+
+.minimap {
+  position: absolute;
+  z-index: 4;
+  right: 1.7rem;
+  bottom: 1.7rem;
+  width: 12rem;
+  height: 8rem;
+  border: 1px solid #9eb397;
+  border-radius: 8px;
+  background: #f8fbf6;
+  box-shadow: 0 8px 22px rgb(31 49 27 / 12%);
+  cursor: pointer;
+}
+
+.minimap .map-object {
+  pointer-events: none;
+}
+
+.minimap-bg {
+  fill: #eef6ea;
+}
+
+.minimap-view {
+  fill: rgb(37 99 235 / 10%);
+  stroke: #1d4ed8;
+  stroke-width: 0.35;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
 
 .snap-widget label {

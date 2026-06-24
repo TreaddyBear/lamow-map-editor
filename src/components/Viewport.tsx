@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { moveAreaShapeHandle, movePathShapeHandle } from "../domain/editHandles";
 import type { LevelV1, Point2, Rect, Selection } from "../domain/model";
 import type { CanvasTool, PendingPathState } from "../domain/model";
@@ -29,6 +29,12 @@ type LiveEditHandleDragState = {
   moved: boolean;
 };
 
+type PanState = {
+  pointerId: number;
+  startClient: [number, number];
+  startViewBox: Rect;
+} | null;
+
 type Props = {
   level: LevelV1;
   bounds: Rect;
@@ -51,10 +57,14 @@ export function Viewport(props: Props) {
   const { level, bounds } = props;
   const liveDragRef = useRef<LiveDragState | null>(null);
   const liveEditHandleDragRef = useRef<LiveEditHandleDragState | null>(null);
-  const width = Math.max(1, bounds.xMax - bounds.xMin);
-  const height = Math.max(1, bounds.zMax - bounds.zMin);
+  const panRef = useRef<PanState>(null);
+  const [viewBox, setViewBox] = useState(bounds);
+  const width = Math.max(1, viewBox.xMax - viewBox.xMin);
+  const height = Math.max(1, viewBox.zMax - viewBox.zMin);
 
-  const eventToWorld = (svg: SVGSVGElement, event: ReactPointerEvent<SVGSVGElement> | ReactMouseEvent<SVGSVGElement>): Point2 | null => {
+  useEffect(() => setViewBox(bounds), [bounds]);
+
+  const eventToWorld = (svg: SVGSVGElement, event: ReactPointerEvent<SVGSVGElement> | ReactMouseEvent<SVGSVGElement> | ReactWheelEvent<SVGSVGElement>): Point2 | null => {
     const ctm = svg.getScreenCTM();
     if (!ctm) return null;
     const point = svg.createSVGPoint();
@@ -75,12 +85,19 @@ export function Viewport(props: Props) {
   };
 
   return (
+    <>
     <svg
       id="map-svg"
       className="map-board"
-      viewBox={`${bounds.xMin} ${bounds.zMin} ${width} ${height}`}
+      viewBox={`${viewBox.xMin} ${viewBox.zMin} ${width} ${height}`}
       preserveAspectRatio="xMidYMid meet"
       onPointerDown={(event) => {
+        if (event.button === 1) {
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          panRef.current = { pointerId: event.pointerId, startClient: [event.clientX, event.clientY], startViewBox: viewBox };
+          return;
+        }
         if (event.button !== 0) return;
         const world = eventToWorld(event.currentTarget, event);
         if (!world) return;
@@ -110,6 +127,15 @@ export function Viewport(props: Props) {
         props.onClearSelection();
       }}
       onPointerMove={(event) => {
+        if (panRef.current) {
+          const pan = panRef.current;
+          const scaleX = (pan.startViewBox.xMax - pan.startViewBox.xMin) / Math.max(1, event.currentTarget.clientWidth);
+          const scaleZ = (pan.startViewBox.zMax - pan.startViewBox.zMin) / Math.max(1, event.currentTarget.clientHeight);
+          const dx = (event.clientX - pan.startClient[0]) * scaleX;
+          const dz = (event.clientY - pan.startClient[1]) * scaleZ;
+          setViewBox(translateRect(pan.startViewBox, -dx, -dz));
+          return;
+        }
         const world = eventToWorld(event.currentTarget, event);
         if (!world) return;
         if (liveEditHandleDragRef.current) {
@@ -133,6 +159,10 @@ export function Viewport(props: Props) {
         }
       }}
       onPointerUp={(event) => {
+        if (panRef.current?.pointerId === event.pointerId) {
+          panRef.current = null;
+          return;
+        }
         const drag = liveDragRef.current;
         if (drag?.moved) {
           clearLiveDrag(event.currentTarget, drag.selection);
@@ -145,6 +175,10 @@ export function Viewport(props: Props) {
         props.onReleaseViewport();
       }}
       onPointerCancel={(event) => {
+        if (panRef.current?.pointerId === event.pointerId) {
+          panRef.current = null;
+          return;
+        }
         if (liveDragRef.current) clearLiveDrag(event.currentTarget, liveDragRef.current.selection);
         if (liveEditHandleDragRef.current) applySelectedGeometryPreview(event.currentTarget, level, liveEditHandleDragRef.current.selection);
         liveDragRef.current = null;
@@ -156,6 +190,15 @@ export function Viewport(props: Props) {
         const world = eventToWorld(event.currentTarget, event);
         if (!world) return;
         props.onContextMenu(event.clientX, event.clientY, world, targetSelection(event.target) ?? undefined);
+      }}
+      onAuxClick={(event) => {
+        if (event.button === 1) event.preventDefault();
+      }}
+      onWheel={(event) => {
+        event.preventDefault();
+        const world = eventToWorld(event.currentTarget, event);
+        if (!world) return;
+        setViewBox((current) => zoomRectAt(current, world, event.deltaY > 0 ? 1.14 : 0.88));
       }}
     >
       <defs>
@@ -174,9 +217,56 @@ export function Viewport(props: Props) {
         <circle r="0.38" fill="#ffffff" stroke="#1d4ed8" strokeWidth="0.1" />
         <path d="M -0.18 0.15 L 0 -0.22 L 0.18 0.15 Z" fill="#1d4ed8" />
       </g>
-      <SelectionHandles level={level} selection={props.selection} />
+      <SelectionHandles level={level} selection={props.selection} viewBox={viewBox} />
     </svg>
+    <div className="zoom-widget">
+      <button type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 0.82))}>+</button>
+      <button type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 1.18))}>-</button>
+      <button type="button" onClick={() => setViewBox(bounds)}>Fit</button>
+    </div>
+    <svg
+      className="minimap"
+      viewBox={`${bounds.xMin} ${bounds.zMin} ${Math.max(1, bounds.xMax - bounds.xMin)} ${Math.max(1, bounds.zMax - bounds.zMin)}`}
+      preserveAspectRatio="xMidYMid meet"
+      onPointerDown={(event) => {
+        const point = eventToWorld(event.currentTarget, event);
+        if (!point) return;
+        setViewBox((current) => centerRectOn(current, point));
+      }}
+    >
+      <rect x={bounds.xMin} y={bounds.zMin} width={Math.max(1, bounds.xMax - bounds.xMin)} height={Math.max(1, bounds.zMax - bounds.zMin)} className="minimap-bg" />
+      {level.areas.map((area, index) => <AreaSvg key={`${area.id}-${index}`} area={area} path={[index]} selection={{ kind: "level" }} />)}
+      <rect className="minimap-view" x={viewBox.xMin} y={viewBox.zMin} width={width} height={height} />
+    </svg>
+    </>
   );
+}
+
+function rectCenter(rect: Rect): Point2 {
+  return [(rect.xMin + rect.xMax) / 2, (rect.zMin + rect.zMax) / 2];
+}
+
+function translateRect(rect: Rect, dx: number, dz: number): Rect {
+  return { xMin: rect.xMin + dx, xMax: rect.xMax + dx, zMin: rect.zMin + dz, zMax: rect.zMax + dz };
+}
+
+function centerRectOn(rect: Rect, point: Point2): Rect {
+  const width = rect.xMax - rect.xMin;
+  const height = rect.zMax - rect.zMin;
+  return { xMin: point[0] - width / 2, xMax: point[0] + width / 2, zMin: point[1] - height / 2, zMax: point[1] + height / 2 };
+}
+
+function zoomRectAt(rect: Rect, point: Point2, factor: number): Rect {
+  const width = (rect.xMax - rect.xMin) * factor;
+  const height = (rect.zMax - rect.zMin) * factor;
+  const leftRatio = (point[0] - rect.xMin) / Math.max(0.001, rect.xMax - rect.xMin);
+  const topRatio = (point[1] - rect.zMin) / Math.max(0.001, rect.zMax - rect.zMin);
+  return {
+    xMin: point[0] - width * leftRatio,
+    xMax: point[0] + width * (1 - leftRatio),
+    zMin: point[1] - height * topRatio,
+    zMax: point[1] + height * (1 - topRatio),
+  };
 }
 
 function snapHandleTarget(world: Point2, start: Point2, snap: SnapSettings): Point2 {
