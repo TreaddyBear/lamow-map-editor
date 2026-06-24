@@ -1,294 +1,61 @@
 import "./styles.css";
+import {
+  normalizeRect,
+  pathBounds,
+  pathPoints,
+  rectContainsRect,
+  rectFromCenter,
+  rectsOverlap,
+  shapeBounds,
+  translateArea,
+  translatePathShape,
+  translatePoint,
+  translateShape,
+} from "./domain/geometry";
+import {
+  clone,
+  defaultCoordinates,
+  defaultPack,
+  defaultPerlinDistribution,
+  foliageRegistry,
+  type Area,
+  type AreaShape,
+  type AuthoredItem,
+  type CanvasTool,
+  type CoordinateMetadata,
+  type ContextMenuState,
+  type DirtPath,
+  type Distribution,
+  type DragState,
+  type Fence,
+  type FoliageType,
+  type HeightFeature,
+  type HistoryEntry,
+  type LegacyFenceSegment,
+  type LegacyMapSpec,
+  type LevelV1,
+  type MapPackV1,
+  type PathShape,
+type PathTool,
+type PendingPathState,
+  type PerlinDistribution,
+  type Point2,
+  type Rect,
+  type Road,
+  type Selection,
+  type SelectionKind,
+  type Spawn,
+  type Vec3,
+  type VegetationLayer,
+} from "./domain/model";
 
-type Point2 = [x: number, z: number];
-type Point3 = [x: number, y: number, z: number];
-type Rect = { xMin: number; xMax: number; zMin: number; zMax: number };
-type Vec3 = { x: number; y: number; z: number };
-
-type CoordinateMetadata = {
-  axes: { x: "east"; y: "up"; z: "north" };
-  point2: ["x", "z"];
-  point3: ["x", "y", "z"];
-  angles: {
-    unit: "degrees";
-    zero: "+x (east)";
-    positive: string;
-    direction: string;
-  };
-};
-
-type PackInfo = {
-  prefix: string;
-  name: string;
-};
-
-type MapPackV1 = {
-  version: 1;
-  units: "meters";
-  coordinates?: CoordinateMetadata;
-  pack: PackInfo;
-  levels: LevelV1[];
-};
-
-type LevelV1 = {
-  code: string;
-  name: string;
-  parSeconds: number;
-  spawn: Spawn;
-  areas: Area[];
-  roads: Road[];
-  dirtPaths: DirtPath[];
-  fences: Fence[];
-  terrain: Terrain;
-  objects: unknown[];
-  tags?: string[];
-};
-
-type Spawn = {
-  position: Point2;
-  headingDegrees: number;
-};
-
-type EditorHints = {
-  locked?: boolean;
-  layer?: string;
-};
-
-type AuthoredItem = {
-  id: string;
-  name?: string;
-  tags?: string[];
-  editor?: EditorHints;
-};
-
-type AreaShape =
-  | { type: "rectangle"; center: Point2; size: Point2; rotationDegrees?: number }
-  | { type: "circle"; center: Point2; radius: number }
-  | { type: "polygon"; points: Point2[] };
-
-type PathShape =
-  | { type: "line"; start: Point2; end: Point2 }
-  | { type: "polyline"; points: Point2[] }
-  | { type: "cubicBezierPath"; start: Point2; curves: { c1: Point2; c2: Point2; end: Point2 }[] };
-
-type Distribution = UniformDistribution | PerlinDistribution;
-
-type UniformDistribution = {
-  type: "uniform";
-  density: number;
-};
-
-type PerlinDistribution = {
-  type: "perlin";
-  density: number;
-  noise: {
-    seed: number;
-    octaves: { frequency: number; weight: number }[];
-    domainWarp?: number;
-    threshold: number;
-    softness: number;
-  };
-};
-
-type VegetationLayer = {
-  id: string;
-  type: FoliageType;
-  distribution: Distribution;
-};
-
-type Area = AuthoredItem & {
-  kind: "area";
-  composition?: "replace" | "additive";
-  role?: "background" | "lawn" | "bed";
-  mowable?: boolean;
-  surface?: "grass" | "dirt";
-  shape: AreaShape;
-  edgeFalloff?: number;
-  vegetation: VegetationLayer[];
-  children?: Area[];
-};
-
-type Road = AuthoredItem & {
-  kind: "road";
-  width: number;
-  shape: PathShape;
-};
-
-type DirtPath = AuthoredItem & {
-  kind: "dirtPath";
-  width: number;
-  shape: PathShape;
-};
-
-type Fence = AuthoredItem & {
-  kind: "fence";
-  height: number;
-  postSpacing?: number;
-  shape: PathShape;
-};
-
-type Terrain = {
-  heightFeatures: HeightFeature[];
-};
-
-type HeightFeature = AuthoredItem & {
-  type: "hill";
-  shape: AreaShape;
-  height: number;
-  falloff: number;
-};
-
-type FoliageType =
-  | "grass"
-  | "clover"
-  | "leaf"
-  | "dandelion"
-  | "flowerBlue"
-  | "flowerWhite"
-  | "flowerYellow"
-  | "flowerRed"
-  | "tulip";
-
-type LegacySegment = Rect & { width?: number; height?: number; center?: Vec3 };
-type LegacyFenceSegment = { start?: Vec3; end?: Vec3 };
-type LegacyFlowerBed = Rect & { count?: number };
-type LegacyFlowerField = { variant?: "blue" | "white" | "yellow" | "red"; area?: Rect; spacing?: number };
-type LegacyCloverPatch = { x?: number; z?: number; radius?: number; spacing?: number; grassKeep?: number };
-type LegacyMapSpec = {
-  code?: string;
-  name?: string;
-  parSeconds?: number;
-  spawn?: Vec3;
-  segments?: LegacySegment[];
-  fenceSegments?: LegacyFenceSegment[];
-  flowerBeds?: LegacyFlowerBed[];
-  dandelionCount?: number;
-  flowerFields?: LegacyFlowerField[];
-  cloverPatches?: LegacyCloverPatch[];
-};
-
-type CanvasTool = "select" | "spawn" | "area" | "fence" | "road" | "dirtPath" | "hill";
-type PathTool = "fence" | "road" | "dirtPath";
-type SelectionKind = "level" | "spawn" | "area" | "vegetation" | "road" | "dirtPath" | "fence" | "heightFeature" | "objects";
-type Selection = { kind: SelectionKind; path?: number[]; index?: number; vegetationIndex?: number };
-type ContextMenuState = { screenX: number; screenY: number; world: Point2; target?: Selection } | null;
-type DragState = { selection: Selection; last: Point2; moved: boolean } | null;
-type PendingPathState = { kind: PathTool; start: Point2 } | null;
-type HistoryEntry = {
-  pack: MapPackV1;
-  selectedLevelIndex: number;
+type EditHandleDragState = {
   selection: Selection;
-};
-
-const defaultCoordinates: CoordinateMetadata = {
-  axes: { x: "east", y: "up", z: "north" },
-  point2: ["x", "z"],
-  point3: ["x", "y", "z"],
-  angles: {
-    unit: "degrees",
-    zero: "+x (east)",
-    positive: "counter-clockwise in the XZ plane, from +x toward +z",
-    direction: "heading T maps to ground vector (x, z) = (cos T, sin T)",
-  },
-};
-
-const foliageRegistry: { key: FoliageType; label: string; category: "groundcover" | "wildflower" | "prizeFlower" | "decor" }[] = [
-  { key: "grass", label: "Grass", category: "groundcover" },
-  { key: "clover", label: "Clover", category: "groundcover" },
-  { key: "leaf", label: "Leaf", category: "decor" },
-  { key: "dandelion", label: "Dandelion", category: "wildflower" },
-  { key: "flowerBlue", label: "Blue Flower", category: "wildflower" },
-  { key: "flowerWhite", label: "White Flower", category: "wildflower" },
-  { key: "flowerYellow", label: "Yellow Flower", category: "wildflower" },
-  { key: "flowerRed", label: "Red Flower", category: "wildflower" },
-  { key: "tulip", label: "Tulip", category: "prizeFlower" },
-];
-
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-
-const defaultPack: MapPackV1 = {
-  version: 1,
-  units: "meters",
-  coordinates: defaultCoordinates,
-  pack: { prefix: "bgrn", name: "Beta Green" },
-  levels: [
-    {
-      code: "ell",
-      name: "Front Lawn",
-      parSeconds: 300,
-      spawn: { position: [-5, 0], headingDegrees: 0 },
-      areas: [
-        {
-          id: "yard",
-          kind: "area",
-          role: "background",
-          shape: { type: "rectangle", center: [0, 0], size: [120, 120] },
-          vegetation: [{ id: "yardGrass", type: "grass", distribution: { type: "uniform", density: 0.25 } }],
-          children: [
-            {
-              id: "frontLawn",
-              kind: "area",
-              role: "lawn",
-              shape: { type: "rectangle", center: [0, 0], size: [18, 14] },
-              vegetation: [{ id: "frontLawnGrass", type: "grass", distribution: { type: "uniform", density: 1 } }],
-              children: [
-                {
-                  id: "cloverPatch",
-                  kind: "area",
-                  composition: "replace",
-                  role: "lawn",
-                  shape: { type: "circle", center: [-5, -3], radius: 2.2 },
-                  edgeFalloff: 0.6,
-                  vegetation: [
-                    {
-                      id: "cloverPatchLayer",
-                      type: "clover",
-                      distribution: defaultPerlinDistribution(1, 7),
-                    },
-                  ],
-                },
-                {
-                  id: "flowerScatter",
-                  kind: "area",
-                  composition: "additive",
-                  shape: { type: "rectangle", center: [5.5, -1.5], size: [3, 2] },
-                  edgeFalloff: 0.4,
-                  vegetation: [
-                    { id: "flowerScatterYellow", type: "flowerYellow", distribution: defaultPerlinDistribution(0.2, 21) },
-                    { id: "flowerScatterRed", type: "flowerRed", distribution: defaultPerlinDistribution(0.16, 99) },
-                  ],
-                },
-                {
-                  id: "roseBed",
-                  kind: "area",
-                  role: "bed",
-                  shape: { type: "circle", center: [4, 3], radius: 1.4 },
-                  vegetation: [{ id: "roseBedTulips", type: "tulip", distribution: { type: "uniform", density: 0.35 } }],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-      roads: [{ id: "mainRoad", kind: "road", width: 3.2, shape: { type: "line", start: [13, -18], end: [13, 18] } }],
-      dirtPaths: [{ id: "gardenPath", kind: "dirtPath", width: 1.1, shape: { type: "line", start: [-8, 2], end: [4, 3] } }],
-      fences: [
-        {
-          id: "westFence",
-          kind: "fence",
-          height: 1,
-          postSpacing: 2,
-          shape: { type: "polyline", points: [[-9, -7], [9, -7], [9, 7], [-9, 7], [-9, -7]] },
-        },
-      ],
-      terrain: {
-        heightFeatures: [{ id: "softHillA", type: "hill", shape: { type: "circle", center: [-20, -12], radius: 8 }, height: 3.5, falloff: 1 }],
-      },
-      objects: [],
-      tags: [],
-    },
-  ],
-};
+  handle: string;
+  index?: number;
+  last: Point2;
+  moved: boolean;
+} | null;
 
 let pack: MapPackV1 = clone(defaultPack);
 let selectedLevelIndex = 0;
@@ -300,28 +67,14 @@ let canvasTool: CanvasTool = "select";
 let pendingPath: PendingPathState = null;
 let contextMenu: ContextMenuState = null;
 let dragState: DragState = null;
+let editHandleDragState: EditHandleDragState = null;
 let treePanePx = 360;
+let sidebarCollapsed = false;
+let sidebarPanes = { tree: true, inspector: true, json: false };
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing #app root");
 const appRoot = root;
-
-function defaultPerlinDistribution(density = 1, seed = 1): PerlinDistribution {
-  return {
-    type: "perlin",
-    density,
-    noise: {
-      seed,
-      octaves: [
-        { frequency: 0.4, weight: 1 },
-        { frequency: 0.9, weight: 0.4 },
-      ],
-      domainWarp: 0.3,
-      threshold: 0.5,
-      softness: 0.12,
-    },
-  };
-}
 
 function currentLevel(): LevelV1 {
   return pack.levels[selectedLevelIndex] ?? pack.levels[0] ?? clone(defaultPack.levels[0]);
@@ -805,89 +558,6 @@ function foliageType(value: unknown): FoliageType {
   return foliageRegistry.some((entry) => entry.key === value) ? (value as FoliageType) : "grass";
 }
 
-function rectFromCenter(center: Point2, size: Point2): Rect {
-  return {
-    xMin: center[0] - Math.abs(size[0]) / 2,
-    xMax: center[0] + Math.abs(size[0]) / 2,
-    zMin: center[1] - Math.abs(size[1]) / 2,
-    zMax: center[1] + Math.abs(size[1]) / 2,
-  };
-}
-
-function normalizeRect(rect: Rect): Rect {
-  return {
-    xMin: Math.min(rect.xMin, rect.xMax),
-    xMax: Math.max(rect.xMin, rect.xMax),
-    zMin: Math.min(rect.zMin, rect.zMax),
-    zMax: Math.max(rect.zMin, rect.zMax),
-  };
-}
-
-function rectsOverlap(a: Rect, b: Rect): boolean {
-  return a.xMin < b.xMax && a.xMax > b.xMin && a.zMin < b.zMax && a.zMax > b.zMin;
-}
-
-function rectContainsRect(parent: Rect, child: Rect): boolean {
-  return child.xMin >= parent.xMin && child.xMax <= parent.xMax && child.zMin >= parent.zMin && child.zMax <= parent.zMax;
-}
-
-function shapeBounds(shape: AreaShape): Rect {
-  if (shape.type === "circle") {
-    return { xMin: shape.center[0] - shape.radius, xMax: shape.center[0] + shape.radius, zMin: shape.center[1] - shape.radius, zMax: shape.center[1] + shape.radius };
-  }
-  if (shape.type === "polygon") {
-    const xs = shape.points.map((point) => point[0]);
-    const zs = shape.points.map((point) => point[1]);
-    return { xMin: Math.min(...xs), xMax: Math.max(...xs), zMin: Math.min(...zs), zMax: Math.max(...zs) };
-  }
-  return rectFromCenter(shape.center, shape.size);
-}
-
-function pathBounds(shape: PathShape): Rect {
-  const points = pathPoints(shape);
-  const xs = points.map((point) => point[0]);
-  const zs = points.map((point) => point[1]);
-  return { xMin: Math.min(...xs), xMax: Math.max(...xs), zMin: Math.min(...zs), zMax: Math.max(...zs) };
-}
-
-function pathPoints(shape: PathShape): Point2[] {
-  if (shape.type === "line") return [shape.start, shape.end];
-  if (shape.type === "polyline") return shape.points;
-  return [shape.start, ...shape.curves.flatMap((curve) => [curve.c1, curve.c2, curve.end])];
-}
-
-function translatePoint(point: Point2, dx: number, dz: number): Point2 {
-  return [round(point[0] + dx), round(point[1] + dz)];
-}
-
-function translateShape(shape: AreaShape, dx: number, dz: number): AreaShape {
-  if (shape.type === "circle") return { ...shape, center: translatePoint(shape.center, dx, dz) };
-  if (shape.type === "polygon") return { ...shape, points: shape.points.map((point) => translatePoint(point, dx, dz)) };
-  return { ...shape, center: translatePoint(shape.center, dx, dz) };
-}
-
-function translatePathShape(shape: PathShape, dx: number, dz: number): PathShape {
-  if (shape.type === "line") return { ...shape, start: translatePoint(shape.start, dx, dz), end: translatePoint(shape.end, dx, dz) };
-  if (shape.type === "polyline") return { ...shape, points: shape.points.map((point) => translatePoint(point, dx, dz)) };
-  return {
-    ...shape,
-    start: translatePoint(shape.start, dx, dz),
-    curves: shape.curves.map((curve) => ({
-      c1: translatePoint(curve.c1, dx, dz),
-      c2: translatePoint(curve.c2, dx, dz),
-      end: translatePoint(curve.end, dx, dz),
-    })),
-  };
-}
-
-function translateArea(area: Area, dx: number, dz: number): Area {
-  return {
-    ...area,
-    shape: translateShape(area.shape, dx, dz),
-    children: area.children?.map((child) => translateArea(child, dx, dz)),
-  };
-}
-
 function moveSelection(item: Selection, dx: number, dz: number): void {
   if (dx === 0 && dz === 0) return;
   if (item.kind === "spawn") {
@@ -916,6 +586,82 @@ function moveSelection(item: Selection, dx: number, dz: number): void {
       },
     }), false);
   }
+}
+
+function moveEditHandle(item: Selection, handle: string, index: number | undefined, world: Point2, dx: number, dz: number): void {
+  if (item.kind === "spawn") {
+    updateLevel((level) => {
+      const [x, z] = level.spawn.position;
+      const headingDegrees = Math.atan2(world[1] - z, world[0] - x) * (180 / Math.PI);
+      return { ...level, spawn: { ...level.spawn, headingDegrees: round(headingDegrees) } };
+    }, false);
+  }
+  if (item.kind === "area" && item.path) {
+    updateSelectedArea(item.path, (area) => ({ ...area, shape: moveAreaShapeHandle(area.shape, handle, index, world, dx, dz) }), false);
+  }
+  if (item.kind === "heightFeature" && item.index !== undefined) {
+    updateLevel((level) => ({
+      ...level,
+      terrain: {
+        heightFeatures: updateArray(level.terrain.heightFeatures, item.index!, {
+          ...level.terrain.heightFeatures[item.index!],
+          shape: moveAreaShapeHandle(level.terrain.heightFeatures[item.index!].shape, handle, index, world, dx, dz),
+        }),
+      },
+    }), false);
+  }
+  if ((item.kind === "road" || item.kind === "dirtPath") && item.index !== undefined) {
+    const key = item.kind === "road" ? "roads" : "dirtPaths";
+    updateLevel((level) => {
+      const items = level[key];
+      return { ...level, [key]: updateArray(items, item.index!, { ...items[item.index!], shape: movePathShapeHandle(items[item.index!].shape, handle, index, world, dx, dz) }) } as LevelV1;
+    }, false);
+  }
+  if (item.kind === "fence" && item.index !== undefined) {
+    updateLevel((level) => ({
+      ...level,
+      fences: updateArray(level.fences, item.index!, { ...level.fences[item.index!], shape: movePathShapeHandle(level.fences[item.index!].shape, handle, index, world, dx, dz) }),
+    }), false);
+  }
+}
+
+function moveAreaShapeHandle(shape: AreaShape, handle: string, index: number | undefined, world: Point2, dx: number, dz: number): AreaShape {
+  if (shape.type === "circle") {
+    if (handle === "center") return { ...shape, center: translatePoint(shape.center, dx, dz) };
+    if (handle === "radius") {
+      const radius = Math.max(0.1, Math.hypot(world[0] - shape.center[0], world[1] - shape.center[1]));
+      return { ...shape, radius: round(radius) };
+    }
+  }
+  if (shape.type === "rectangle") {
+    if (handle === "center") return { ...shape, center: translatePoint(shape.center, dx, dz) };
+    if (handle === "corner") {
+      return { ...shape, size: [Math.max(0.1, round(Math.abs(world[0] - shape.center[0]) * 2)), Math.max(0.1, round(Math.abs(world[1] - shape.center[1]) * 2))] };
+    }
+  }
+  if (shape.type === "polygon" && handle === "vertex" && index !== undefined) {
+    return { ...shape, points: updateArray(shape.points, index, [round(world[0]), round(world[1])]) };
+  }
+  return shape;
+}
+
+function movePathShapeHandle(shape: PathShape, handle: string, index: number | undefined, world: Point2, dx: number, dz: number): PathShape {
+  const point: Point2 = [round(world[0]), round(world[1])];
+  if (shape.type === "line") {
+    if (handle === "start") return { ...shape, start: point };
+    if (handle === "end") return { ...shape, end: point };
+  }
+  if (shape.type === "polyline" && handle === "vertex" && index !== undefined) {
+    return { ...shape, points: updateArray(shape.points, index, point) };
+  }
+  if (shape.type === "cubicBezierPath") {
+    if (handle === "start") return { ...shape, start: point };
+    if (index === undefined) return shape;
+    const curveIndex = Math.floor(index / 3);
+    const key = ["c1", "c2", "end"][index % 3] as "c1" | "c2" | "end";
+    return { ...shape, curves: updateArray(shape.curves, curveIndex, { ...shape.curves[curveIndex], [key]: point }) };
+  }
+  return translatePathShape(shape, dx, dz);
 }
 
 function renderLevelSelector(): string {
@@ -1291,16 +1037,18 @@ function renderContextMenu(): string {
     ${target && isDeletable(target) ? `<button id="ctx-delete-target" class="danger" type="button">Delete ${escapeText(contextLabel(target))}</button>` : ""}
     ${target ? `<div class="context-divider"></div>` : ""}
     <button id="ctx-move-spawn" type="button">Move spawn to crosshair</button>
-    <button id="ctx-add-area" type="button">Add lawn area here</button>
-    <button id="ctx-add-child-area" type="button">${areaTarget ? "Add child area here" : "Add area here"}</button>
-    <button id="ctx-add-clover" type="button">Add replace clover here</button>
-    <button id="ctx-add-flowers" type="button">Add additive flowers here</button>
-    <button id="ctx-add-bed" type="button">Add bed here</button>
-    <div class="context-divider"></div>
-    <button id="ctx-add-fence-start" type="button">${pendingPath?.kind === "fence" ? "Finish fence at crosshair" : "Start fence at crosshair"}</button>
-    <button id="ctx-add-road" type="button">Add short road here</button>
-    <button id="ctx-add-dirt-path" type="button">Add short dirt path here</button>
-    <button id="ctx-add-hill" type="button">Add hill here</button>
+    <details class="context-submenu" open>
+      <summary>Add</summary>
+      <button id="ctx-add-area" type="button">Lawn area here</button>
+      <button id="ctx-add-child-area" type="button">${areaTarget ? "Child area here" : "Area here"}</button>
+      <button id="ctx-add-clover" type="button">Clover patch here</button>
+      <button id="ctx-add-flowers" type="button">Flower scatter here</button>
+      <button id="ctx-add-bed" type="button">Bed here</button>
+      <button id="ctx-add-fence-start" type="button">${pendingPath?.kind === "fence" ? "Finish fence at crosshair" : "Start fence at crosshair"}</button>
+      <button id="ctx-add-road" type="button">Short road here</button>
+      <button id="ctx-add-dirt-path" type="button">Short dirt path here</button>
+      <button id="ctx-add-hill" type="button">Hill here</button>
+    </details>
   </div>`;
 }
 
@@ -1370,26 +1118,53 @@ function render(): void {
   const validation = validateLevel(pack, level);
   const bounds = getBounds(level);
   const exportValue = exportJsonValue();
+  const allSidebarPanesCollapsed = !sidebarPanes.tree && !sidebarPanes.inspector && !sidebarPanes.json;
+  const isSidebarCollapsed = sidebarCollapsed || allSidebarPanesCollapsed;
 
   appRoot.innerHTML = `
-    <main class="app">
-      <aside class="panel sidebar-panel">
+    <main class="app ${isSidebarCollapsed ? "sidebar-is-collapsed" : ""}">
+      <aside class="panel sidebar-panel ${isSidebarCollapsed ? "collapsed" : ""}">
         <div class="panel-header">
           <h1>LaMow Map Editor</h1>
           <div class="json-actions">
+            ${button("toggle-sidebar", isSidebarCollapsed ? "Show" : "Hide")}
             ${undoStack.length > 0 ? button("undo-edit", "Undo") : disabledButton("Undo")}
             ${button("reset-map", "Reset")}
           </div>
         </div>
-        <div class="editor-sidebar" style="--tree-pane: ${treePanePx}px">
-          <div id="tree-pane" class="tree-pane">
-            ${renderLevelSelector()}
-            ${renderObjectTree()}
-          </div>
-          <div id="tree-resizer" class="tree-resizer" title="Drag to resize"></div>
-          <div class="inspector-pane">
-            ${renderInspector()}
-          </div>
+        <div class="editor-sidebar">
+          <details id="sidebar-pane-tree" class="sidebar-pane" ${sidebarPanes.tree ? "open" : ""}>
+            <summary>Map</summary>
+            <div class="tree-pane">
+              ${renderLevelSelector()}
+              ${renderObjectTree()}
+            </div>
+          </details>
+          <details id="sidebar-pane-inspector" class="sidebar-pane" ${sidebarPanes.inspector ? "open" : ""}>
+            <summary>Inspector</summary>
+            <div class="inspector-pane">
+              ${renderInspector()}
+            </div>
+          </details>
+          <details id="sidebar-pane-json" class="sidebar-pane" ${sidebarPanes.json ? "open" : ""}>
+            <summary>Import / Export</summary>
+            <div class="panel-body stack">
+              <div class="json-actions">
+                ${button("copy-json", "Copy", "primary")}
+                ${button("open-json-file", "Open file")}
+                ${button("read-clipboard", "Import clipboard")}
+                ${button("load-json", "Import")}
+              </div>
+              <input id="json-file-input" type="file" accept="application/json,.json,.txt,text/plain" hidden />
+              <div id="json-drop-zone" class="drop-zone">
+                <strong>Drop a JSON file here</strong>
+                <span>Use this when paste cuts off large map bundles.</span>
+              </div>
+              <textarea id="json-output" spellcheck="false">${escapeText(jsonText || JSON.stringify(exportValue, null, 2))}</textarea>
+              ${importMessage ? `<div class="${importMessage.startsWith("Imported") || importMessage.startsWith("Copied") ? "ok" : "error"}">${escapeText(importMessage)}</div>` : ""}
+              <div class="hint">Import accepts the draft v1 pack shape, a single v1 level, or old prototype map JSON. Export is always the draft v1 pack shape.</div>
+            </div>
+          </details>
         </div>
       </aside>
 
@@ -1415,27 +1190,6 @@ function render(): void {
         </div>
       </section>
 
-      <aside class="panel json-panel">
-        <div class="panel-header">
-          <h2>JSON</h2>
-          <div class="json-actions">
-            ${button("copy-json", "Copy", "primary")}
-            ${button("open-json-file", "Open file")}
-            ${button("read-clipboard", "Import clipboard")}
-            ${button("load-json", "Import")}
-          </div>
-        </div>
-        <div class="panel-body stack">
-          <input id="json-file-input" type="file" accept="application/json,.json,.txt,text/plain" hidden />
-          <div id="json-drop-zone" class="drop-zone">
-            <strong>Drop a JSON file here</strong>
-            <span>Use this when paste cuts off large map bundles.</span>
-          </div>
-          <textarea id="json-output" spellcheck="false">${escapeText(jsonText || JSON.stringify(exportValue, null, 2))}</textarea>
-          ${importMessage ? `<div class="${importMessage.startsWith("Imported") || importMessage.startsWith("Copied") ? "ok" : "error"}">${escapeText(importMessage)}</div>` : ""}
-          <div class="hint">Import accepts the draft v1 pack shape, a single v1 level, or old prototype map JSON. Export is always the draft v1 pack shape.</div>
-        </div>
-      </aside>
       ${renderContextMenu()}
     </main>
   `;
@@ -1475,6 +1229,7 @@ function renderSvg(level: LevelV1, bounds: Rect): string {
       <circle r="0.38" fill="#ffffff" stroke="#1d4ed8" stroke-width="0.1" />
       <path d="M -0.18 0.15 L 0 -0.22 L 0.18 0.15 Z" fill="#1d4ed8" />
     </g>
+    ${renderSelectionHandles(level)}
   </svg>`;
 }
 
@@ -1488,11 +1243,68 @@ function renderCrosshair(point: Point2): string {
   </g>`;
 }
 
+function renderSelectionHandles(level: LevelV1): string {
+  if (selection.kind === "spawn") {
+    const heading = (level.spawn.headingDegrees * Math.PI) / 180;
+    const point: Point2 = [round(level.spawn.position[0] + Math.cos(heading) * 1.4), round(level.spawn.position[1] + Math.sin(heading) * 1.4)];
+    return `<g class="edit-handles"><line class="edit-handle-guide" x1="${level.spawn.position[0]}" y1="${level.spawn.position[1]}" x2="${point[0]}" y2="${point[1]}" />${renderHandle(point, "heading")}</g>`;
+  }
+  if (selection.kind === "area" && selection.path) {
+    const area = getAreaByPath(level.areas, selection.path);
+    return area ? `<g class="edit-handles">${renderAreaShapeHandles(area.shape)}</g>` : "";
+  }
+  if (selection.kind === "heightFeature" && selection.index !== undefined) {
+    const hill = level.terrain.heightFeatures[selection.index];
+    return hill ? `<g class="edit-handles">${renderAreaShapeHandles(hill.shape)}</g>` : "";
+  }
+  if (selection.kind === "road" && selection.index !== undefined) return `<g class="edit-handles">${renderPathHandles(level.roads[selection.index]?.shape)}</g>`;
+  if (selection.kind === "dirtPath" && selection.index !== undefined) return `<g class="edit-handles">${renderPathHandles(level.dirtPaths[selection.index]?.shape)}</g>`;
+  if (selection.kind === "fence" && selection.index !== undefined) return `<g class="edit-handles">${renderPathHandles(level.fences[selection.index]?.shape)}</g>`;
+  return "";
+}
+
+function renderAreaShapeHandles(shape: AreaShape): string {
+  if (shape.type === "circle") {
+    const radiusPoint: Point2 = [round(shape.center[0] + shape.radius), shape.center[1]];
+    return `${renderHandle(shape.center, "center", undefined, true)}<line class="edit-handle-guide" x1="${shape.center[0]}" y1="${shape.center[1]}" x2="${radiusPoint[0]}" y2="${radiusPoint[1]}" />${renderHandle(radiusPoint, "radius")}`;
+  }
+  if (shape.type === "polygon") {
+    return shape.points.map((point, index) => renderHandle(point, "vertex", index)).join("");
+  }
+  const rect = rectFromCenter(shape.center, shape.size);
+  const corners: Point2[] = [
+    [rect.xMin, rect.zMin],
+    [rect.xMax, rect.zMin],
+    [rect.xMax, rect.zMax],
+    [rect.xMin, rect.zMax],
+  ];
+  return `${renderHandle(shape.center, "center", undefined, true)}${corners.map((point, index) => renderHandle(point, "corner", index)).join("")}`;
+}
+
+function renderPathHandles(shape: PathShape | undefined): string {
+  if (!shape) return "";
+  if (shape.type === "line") return `${renderHandle(shape.start, "start")}${renderHandle(shape.end, "end")}`;
+  if (shape.type === "polyline") return shape.points.map((point, index) => renderHandle(point, "vertex", index)).join("");
+  const controlLines = shape.curves
+    .map((curve, index) => {
+      const anchor = index === 0 ? shape.start : shape.curves[index - 1].end;
+      return `<line class="edit-handle-guide" x1="${anchor[0]}" y1="${anchor[1]}" x2="${curve.c1[0]}" y2="${curve.c1[1]}" /><line class="edit-handle-guide" x1="${curve.end[0]}" y1="${curve.end[1]}" x2="${curve.c2[0]}" y2="${curve.c2[1]}" />`;
+    })
+    .join("");
+  const curveHandles = shape.curves.flatMap((curve, curveIndex) => [renderHandle(curve.c1, "bezier", curveIndex * 3), renderHandle(curve.c2, "bezier", curveIndex * 3 + 1), renderHandle(curve.end, "bezier", curveIndex * 3 + 2, true)]).join("");
+  return `${controlLines}${renderHandle(shape.start, "start", undefined, true)}${curveHandles}`;
+}
+
+function renderHandle(point: Point2, handle: string, index?: number, anchor = false): string {
+  const indexAttr = index === undefined ? "" : ` data-handle-index="${index}"`;
+  return `<circle class="edit-handle ${anchor ? "anchor" : ""}" data-handle="${handle}"${indexAttr} cx="${point[0]}" cy="${point[1]}" r="${anchor ? 0.2 : 0.16}" />`;
+}
+
 function renderAreaSvg(area: Area, path: number[], depth: number): string {
   const selected = sameSelection(selection, { kind: "area", path });
   const fill = areaFill(area);
-  const stroke = selected ? "#1d4ed8" : areaStroke(area);
-  const strokeWidth = selected ? 0.16 : 0.06;
+  const stroke = selected ? "#2563eb" : areaStroke(area);
+  const strokeWidth = selected ? 0.08 : 0.06;
   const opacity = area.composition === "additive" ? 0.42 : area.role === "background" ? 0.24 : 0.68;
   return `${shapeToSvg(area.shape, `${treeAttrs({ kind: "area", path }, "select")} class="map-object ${selected ? "selected-object" : ""}" fill="${fill}" opacity="${opacity}" stroke="${stroke}" stroke-width="${strokeWidth}" data-depth="${depth}"`)}
     ${(area.children ?? []).map((child, index) => renderAreaSvg(child, [...path, index], depth + 1)).join("")}`;
@@ -1513,7 +1325,7 @@ function areaStroke(area: Area): string {
 
 function renderHillSvg(hill: HeightFeature, index: number): string {
   const selected = sameSelection(selection, { kind: "heightFeature", index });
-  return shapeToSvg(hill.shape, `${treeAttrs({ kind: "heightFeature", index }, "select")} class="map-object ${selected ? "selected-object" : ""}" fill="#d8d6c8" opacity="0.42" stroke="${selected ? "#1d4ed8" : "#77715c"}" stroke-width="${selected ? 0.16 : 0.06}" stroke-dasharray="0.4 0.25"`);
+  return shapeToSvg(hill.shape, `${treeAttrs({ kind: "heightFeature", index }, "select")} class="map-object ${selected ? "selected-object" : ""}" fill="#d8d6c8" opacity="0.42" stroke="${selected ? "#2563eb" : "#77715c"}" stroke-width="${selected ? 0.08 : 0.06}" stroke-dasharray="0.4 0.25"`);
 }
 
 function shapeToSvg(shape: AreaShape, attrs: string): string {
@@ -1526,7 +1338,7 @@ function shapeToSvg(shape: AreaShape, attrs: string): string {
 
 function renderPathSvg(shape: PathShape, item: Selection, color: string, width: number, className: string): string {
   const selected = sameSelection(selection, item);
-  const attrs = `${treeAttrs(item, "select")} class="map-object ${className} ${selected ? "selected-object" : ""}" fill="none" stroke="${selected ? "#1d4ed8" : color}" stroke-width="${selected ? Math.max(width, 0.18) : width}" stroke-linecap="round" stroke-linejoin="round"`;
+  const attrs = `${treeAttrs(item, "select")} class="map-object ${className} ${selected ? "selected-object" : ""}" fill="none" stroke="${selected ? "#2563eb" : color}" stroke-width="${selected ? Math.max(width, 0.08) : width}" stroke-linecap="round" stroke-linejoin="round"`;
   if (shape.type === "line") return `<line ${attrs} x1="${shape.start[0]}" y1="${shape.start[1]}" x2="${shape.end[0]}" y2="${shape.end[1]}" />`;
   if (shape.type === "polyline") return `<polyline ${attrs} points="${shape.points.map((point) => `${point[0]},${point[1]}`).join(" ")}" />`;
   const d = `M ${shape.start[0]} ${shape.start[1]} ${shape.curves.map((curve) => `C ${curve.c1[0]} ${curve.c1[1]}, ${curve.c2[0]} ${curve.c2[1]}, ${curve.end[0]} ${curve.end[1]}`).join(" ")}`;
@@ -1651,6 +1463,16 @@ function wireTreeResizer(): void {
 
 function wireButtons(): void {
   document.getElementById("undo-edit")?.addEventListener("click", undo);
+  document.getElementById("toggle-sidebar")?.addEventListener("click", () => {
+    sidebarCollapsed = !sidebarCollapsed;
+    if (!sidebarCollapsed && !sidebarPanes.tree && !sidebarPanes.inspector && !sidebarPanes.json) {
+      sidebarPanes = { ...sidebarPanes, inspector: true };
+    }
+    render();
+  });
+  wireSidebarPane("tree", "sidebar-pane-tree");
+  wireSidebarPane("inspector", "sidebar-pane-inspector");
+  wireSidebarPane("json", "sidebar-pane-json");
   document.getElementById("reset-map")?.addEventListener("click", () => {
     pushUndo();
     pack = clone(defaultPack);
@@ -1694,6 +1516,15 @@ function wireButtons(): void {
   });
 
   wireContextButtons();
+}
+
+function wireSidebarPane(name: keyof typeof sidebarPanes, id: string): void {
+  const pane = document.getElementById(id) as HTMLDetailsElement | null;
+  pane?.addEventListener("toggle", () => {
+    sidebarPanes = { ...sidebarPanes, [name]: pane.open };
+    sidebarCollapsed = false;
+    if (!sidebarPanes.tree && !sidebarPanes.inspector && !sidebarPanes.json) render();
+  });
 }
 
 function wireContextButtons(): void {
@@ -2162,6 +1993,20 @@ function wireSvg(): void {
     if (!world) return;
     contextMenu = null;
 
+    const handleElement = (event.target as Element | null)?.closest("[data-handle]") as HTMLElement | null;
+    if (handleElement) {
+      event.stopPropagation();
+      svg.setPointerCapture(event.pointerId);
+      editHandleDragState = {
+        selection: clone(selection),
+        handle: handleElement.dataset.handle ?? "",
+        index: handleElement.dataset.handleIndex === undefined ? undefined : Number(handleElement.dataset.handleIndex),
+        last: world,
+        moved: false,
+      };
+      return;
+    }
+
     if (canvasTool === "spawn") {
       selection = { kind: "spawn" };
       updateLevel((level) => ({ ...level, spawn: { ...level.spawn, position: world } }));
@@ -2192,6 +2037,20 @@ function wireSvg(): void {
   });
 
   svg.addEventListener("pointermove", (event) => {
+    if (editHandleDragState) {
+      const world = eventToWorld(svg, event);
+      if (!world) return;
+      const dx = round(world[0] - editHandleDragState.last[0]);
+      const dz = round(world[1] - editHandleDragState.last[1]);
+      if (dx === 0 && dz === 0) return;
+      if (!editHandleDragState.moved) {
+        pushUndo();
+        editHandleDragState.moved = true;
+      }
+      moveEditHandle(editHandleDragState.selection, editHandleDragState.handle, editHandleDragState.index, world, dx, dz);
+      editHandleDragState.last = world;
+      return;
+    }
     if (!dragState) return;
     const world = eventToWorld(svg, event);
     if (!world) return;
@@ -2207,6 +2066,10 @@ function wireSvg(): void {
   });
 
   svg.addEventListener("pointerup", () => {
+    if (editHandleDragState) {
+      editHandleDragState = null;
+      return;
+    }
     if (dragState && !dragState.moved) {
       const clicked = dragState.selection;
       dragState = null;

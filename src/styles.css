@@ -80,10 +80,14 @@ textarea {
   height: 100vh;
   max-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(360px, 430px) minmax(0, 1fr) minmax(340px, 420px);
+  grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
   gap: 1rem;
   padding: 1rem;
   overflow: hidden;
+}
+
+.app.sidebar-is-collapsed {
+  grid-template-columns: minmax(148px, 180px) minmax(0, 1fr);
 }
 
 .panel {
@@ -179,17 +183,48 @@ label {
   font-size: 0.85rem;
 }
 
-.sidebar-panel,
-.json-panel {
+.sidebar-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+.sidebar-panel.collapsed .editor-sidebar {
+  display: none;
 }
 
 .editor-sidebar {
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(150px, var(--tree-pane)) 8px minmax(150px, 1fr);
-  overflow: hidden;
+  align-content: start;
+  overflow: auto;
+}
+
+.sidebar-pane {
+  border-bottom: 1px solid #dbe8d5;
+}
+
+.sidebar-pane summary {
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0.7rem 0.85rem;
+  background: #eef6ea;
+  list-style-position: inside;
+}
+
+.sidebar-pane[open] summary {
+  border-bottom: 1px solid #dbe8d5;
+}
+
+.sidebar-pane .panel-body {
+  padding: 0.7rem;
+}
+
+.sidebar-pane textarea {
+  min-height: 10rem;
+}
+
+.json-panel {
+  display: none;
 }
 
 .tree-pane,
@@ -339,8 +374,32 @@ label {
 }
 
 .selected-object {
-  outline: 0.24px solid #1d4ed8;
-  filter: drop-shadow(0 0 0.18px #1d4ed8);
+  filter: drop-shadow(0 0 0.08px #2563eb);
+}
+
+.edit-handles {
+  pointer-events: none;
+}
+
+.edit-handle {
+  fill: #ffffff;
+  stroke: #1d4ed8;
+  stroke-width: 0.08;
+  cursor: pointer;
+  pointer-events: all;
+  vector-effect: non-scaling-stroke;
+}
+
+.edit-handle.anchor {
+  fill: #dbeafe;
+}
+
+.edit-handle-guide {
+  stroke: #2563eb;
+  stroke-width: 0.05;
+  stroke-dasharray: 0.25 0.18;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
 }
 
 .context-menu {
@@ -365,6 +424,22 @@ label {
 
 .context-menu button:hover {
   background: #edf6e9;
+}
+
+.context-submenu {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.context-submenu summary {
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0.45rem 0.6rem;
+  list-style-position: inside;
+}
+
+.context-submenu button {
+  margin-left: 0.75rem;
 }
 
 .context-divider {
