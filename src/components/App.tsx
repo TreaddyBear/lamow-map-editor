@@ -35,31 +35,32 @@ export function App() {
 
   const level = currentLevel(state.pack, state.selectedLevelIndex);
   const validation = useMemo(() => validateLevel(state.pack, level), [state.pack, level]);
-  const bounds = state.activeViewportBounds ?? getBounds(level);
+  const computedBounds = useMemo(() => getBounds(level), [level]);
+  const bounds = state.activeViewportBounds ?? computedBounds;
   const exportValue = useMemo(() => JSON.stringify(exportJsonValue(state.pack), null, 2), [state.pack]);
   const jsonValue = state.jsonText || exportValue;
 
   const record = (updater: (current: EditorState) => EditorState, historyEntry = true) => {
-    setState((current) => {
-      if (historyEntry) setHistory((items) => [...items, clone(current.pack)].slice(-100));
-      return updater(current);
-    });
+    if (historyEntry) setHistory((items) => [...items, clone(state.pack)].slice(-100));
+    setState(updater(state));
   };
   const updateLevel = (updater: (level: LevelV1) => LevelV1, historyEntry = true) => record((current) => ({ ...current, pack: updateCurrentLevel(current.pack, current.selectedLevelIndex, updater), jsonText: "" }), historyEntry);
   const updateArea = (path: number[], updater: (area: Area) => Area) => updateLevel((current) => ({ ...current, areas: updateAreasAtPath(current.areas, path, updater) }));
   const nextId = (base: string) => collectUniqueId(level, base);
 
   const deleteSelection = (item = state.selection) => {
-    updateLevel((current) => {
-      if (item.kind === "area" && item.path) return { ...current, areas: removeAreaAtPath(current.areas, item.path) };
-      if (item.kind === "vegetation" && item.path && item.vegetationIndex !== undefined) return { ...current, areas: updateAreasAtPath(current.areas, item.path, (area) => ({ ...area, vegetation: removeArrayItem(area.vegetation, item.vegetationIndex!) })) };
-      if (item.kind === "road" && item.index !== undefined) return { ...current, roads: removeArrayItem(current.roads, item.index) };
-      if (item.kind === "dirtPath" && item.index !== undefined) return { ...current, dirtPaths: removeArrayItem(current.dirtPaths, item.index) };
-      if (item.kind === "fence" && item.index !== undefined) return { ...current, fences: removeArrayItem(current.fences, item.index) };
-      if (item.kind === "heightFeature" && item.index !== undefined) return { ...current, terrain: { heightFeatures: removeArrayItem(current.terrain.heightFeatures, item.index) } };
-      return current;
+    record((current) => {
+      const nextPack = updateCurrentLevel(current.pack, current.selectedLevelIndex, (currentLevel) => {
+        if (item.kind === "area" && item.path) return { ...currentLevel, areas: removeAreaAtPath(currentLevel.areas, item.path) };
+        if (item.kind === "vegetation" && item.path && item.vegetationIndex !== undefined) return { ...currentLevel, areas: updateAreasAtPath(currentLevel.areas, item.path, (area) => ({ ...area, vegetation: removeArrayItem(area.vegetation, item.vegetationIndex!) })) };
+        if (item.kind === "road" && item.index !== undefined) return { ...currentLevel, roads: removeArrayItem(currentLevel.roads, item.index) };
+        if (item.kind === "dirtPath" && item.index !== undefined) return { ...currentLevel, dirtPaths: removeArrayItem(currentLevel.dirtPaths, item.index) };
+        if (item.kind === "fence" && item.index !== undefined) return { ...currentLevel, fences: removeArrayItem(currentLevel.fences, item.index) };
+        if (item.kind === "heightFeature" && item.index !== undefined) return { ...currentLevel, terrain: { heightFeatures: removeArrayItem(currentLevel.terrain.heightFeatures, item.index) } };
+        return currentLevel;
+      });
+      return { ...current, pack: nextPack, selection: { kind: "level" }, contextMenu: null, jsonText: "" };
     });
-    setState((current) => ({ ...current, selection: { kind: "level" }, contextMenu: null }));
   };
 
   const duplicateSelection = (item: Selection) => {
@@ -67,13 +68,14 @@ export function App() {
     if (item.kind === "area" && item.path) {
       const source = item.path.reduce<Area | undefined>((current, index) => (current ? current.children?.[index] : sourceLevel.areas[index]), undefined);
       if (!source) return;
-      updateLevel((current) => {
-        const copy = translateArea({ ...clone(source), id: nextId(`${source.id}Copy`) }, 1, 1);
+      record((current) => {
+        const level = currentLevel(current.pack, current.selectedLevelIndex);
+        const copy = translateArea({ ...clone(source), id: collectUniqueId(level, `${source.id}Copy`) }, 1, 1);
         const parentPath = item.path!.slice(0, -1);
-        const result = addAreaToLevel(current, copy, parentPath.length > 0 ? parentPath : undefined);
-        setState((old) => ({ ...old, selection: { kind: "area", path: result.path }, contextMenu: null }));
-        return result.level;
+        const result = addAreaToLevel(level, copy, parentPath.length > 0 ? parentPath : undefined);
+        return { ...current, pack: updateCurrentLevel(current.pack, current.selectedLevelIndex, () => result.level), selection: { kind: "area", path: result.path }, contextMenu: null, jsonText: "" };
       });
+      return;
     }
     if (item.kind === "road" && item.index !== undefined) updateLevel((current) => ({ ...current, roads: [...current.roads, { ...clone(current.roads[item.index!]), id: nextId(`${current.roads[item.index!].id}Copy`), shape: translatePathShape(current.roads[item.index!].shape, 1, 1) }] }));
     if (item.kind === "dirtPath" && item.index !== undefined) updateLevel((current) => ({ ...current, dirtPaths: [...current.dirtPaths, { ...clone(current.dirtPaths[item.index!]), id: nextId(`${current.dirtPaths[item.index!].id}Copy`), shape: translatePathShape(current.dirtPaths[item.index!].shape, 1, 1) }] }));
@@ -83,11 +85,11 @@ export function App() {
   };
 
   const addArea = (point: Point2, parentPath?: number[]) => {
-    updateLevel((current) => {
-      const area: Area = { id: nextId("lawnArea"), kind: "area", role: "lawn", shape: { type: "rectangle", center: point, size: [4, 4] }, vegetation: [{ id: nextId("grassLayer"), type: "grass", distribution: { type: "uniform", density: 1 } }] };
-      const result = addAreaToLevel(current, area, parentPath);
-      setState((old) => ({ ...old, selection: { kind: "area", path: result.path }, contextMenu: null }));
-      return result.level;
+    record((current) => {
+      const level = currentLevel(current.pack, current.selectedLevelIndex);
+      const area: Area = { id: collectUniqueId(level, "lawnArea"), kind: "area", role: "lawn", shape: { type: "rectangle", center: point, size: [4, 4] }, vegetation: [{ id: collectUniqueId(level, "grassLayer"), type: "grass", distribution: { type: "uniform", density: 1 } }] };
+      const result = addAreaToLevel(level, area, parentPath);
+      return { ...current, pack: updateCurrentLevel(current.pack, current.selectedLevelIndex, () => result.level), selection: { kind: "area", path: result.path }, contextMenu: null, jsonText: "" };
     });
   };
   const addPathItem = (kind: PathTool, start: Point2, end: Point2) => {
@@ -101,12 +103,12 @@ export function App() {
     updateLevel((current) => ({ ...current, terrain: { heightFeatures: [...current.terrain.heightFeatures, { id: nextId("hill"), type: "hill", shape: { type: "circle", center: point, radius: 4 }, height: 1.5, falloff: 1 } satisfies HeightFeature] } }));
   };
   const addBlueprint = (key: string, point: Point2) => {
-    const area = createAreaFromBlueprint(key, point, nextId);
-    if (!area) return;
-    updateLevel((current) => {
-      const result = addAreaToLevel(current, area, state.selection.kind === "area" ? state.selection.path : undefined);
-      setState((old) => ({ ...old, selection: { kind: "area", path: result.path }, contextMenu: null }));
-      return result.level;
+    record((current) => {
+      const level = currentLevel(current.pack, current.selectedLevelIndex);
+      const area = createAreaFromBlueprint(key, point, (base) => collectUniqueId(level, base));
+      if (!area) return current;
+      const result = addAreaToLevel(level, area, current.selection.kind === "area" ? current.selection.path : undefined);
+      return { ...current, pack: updateCurrentLevel(current.pack, current.selectedLevelIndex, () => result.level), selection: { kind: "area", path: result.path }, contextMenu: null, jsonText: "" };
     });
   };
 
