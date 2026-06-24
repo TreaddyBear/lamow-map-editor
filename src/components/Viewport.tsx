@@ -1,11 +1,28 @@
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { moveAreaShapeHandle, movePathShapeHandle } from "../domain/editHandles";
 import type { LevelV1, Point2, Rect, Selection } from "../domain/model";
 import type { CanvasTool, PendingPathState } from "../domain/model";
-import type { DragState, EditHandleDragState } from "../editor/types";
 import { moveSelection, round, sameSelection, updateArray, updateAreasAtPath } from "../editor/utils";
 import { AreaSvg, HillSvg, PathSvg } from "./viewport/MapObjects";
 import { SelectionHandles } from "./viewport/SelectionHandles";
+import { selectionKey } from "./viewport/svgHelpers";
+
+type LiveDragState = {
+  selection: Selection;
+  start: Point2;
+  last: Point2;
+  dx: number;
+  dz: number;
+  moved: boolean;
+};
+
+type LiveEditHandleDragState = {
+  selection: Selection;
+  handle: string;
+  index?: number;
+  last: Point2;
+  moved: boolean;
+};
 
 type Props = {
   level: LevelV1;
@@ -13,13 +30,9 @@ type Props = {
   selection: Selection;
   canvasTool: CanvasTool;
   pendingPath: PendingPathState;
-  dragState: DragState;
-  editHandleDragState: EditHandleDragState;
   onSelect: (selection: Selection) => void;
   onClearSelection: () => void;
   onUpdateLevel: (updater: (level: LevelV1) => LevelV1) => void;
-  onDragState: (state: DragState) => void;
-  onEditHandleDragState: (state: EditHandleDragState) => void;
   onContextMenu: (screenX: number, screenY: number, world: Point2, target?: Selection) => void;
   onAddArea: (point: Point2, parentPath?: number[]) => void;
   onAddHill: (point: Point2) => void;
@@ -30,6 +43,8 @@ type Props = {
 
 export function Viewport(props: Props) {
   const { level, bounds } = props;
+  const liveDragRef = useRef<LiveDragState | null>(null);
+  const liveEditHandleDragRef = useRef<LiveEditHandleDragState | null>(null);
   const width = Math.max(1, bounds.xMax - bounds.xMin);
   const height = Math.max(1, bounds.zMax - bounds.zMin);
 
@@ -66,7 +81,7 @@ export function Viewport(props: Props) {
         const handleElement = event.target instanceof Element ? event.target.closest("[data-handle]") as HTMLElement | null : null;
         if (handleElement) {
           event.currentTarget.setPointerCapture(event.pointerId);
-          props.onEditHandleDragState({ selection: structuredClone(props.selection), handle: handleElement.dataset.handle ?? "", index: handleElement.dataset.handleIndex === undefined ? undefined : Number(handleElement.dataset.handleIndex), last: world, moved: false });
+          liveEditHandleDragRef.current = { selection: structuredClone(props.selection), handle: handleElement.dataset.handle ?? "", index: handleElement.dataset.handleIndex === undefined ? undefined : Number(handleElement.dataset.handleIndex), last: world, moved: false };
           props.onFreezeViewport();
           return;
         }
@@ -81,7 +96,7 @@ export function Viewport(props: Props) {
         const target = targetSelection(event.target);
         if (target) {
           props.onSelect(target);
-          props.onDragState({ selection: target, last: world, moved: false });
+          liveDragRef.current = { selection: target, start: world, last: world, dx: 0, dz: 0, moved: false };
           props.onFreezeViewport();
           return;
         }
@@ -90,32 +105,38 @@ export function Viewport(props: Props) {
       onPointerMove={(event) => {
         const world = eventToWorld(event.currentTarget, event);
         if (!world) return;
-        if (props.editHandleDragState) {
-          const drag = props.editHandleDragState;
+        if (liveEditHandleDragRef.current) {
+          const drag = liveEditHandleDragRef.current;
           const dx = round(world[0] - drag.last[0]);
           const dz = round(world[1] - drag.last[1]);
           if (dx === 0 && dz === 0) return;
           props.onUpdateLevel((current) => moveEditHandle(current, drag.selection, drag.handle, drag.index, world, dx, dz));
-          props.onEditHandleDragState({ ...drag, last: world, moved: true });
+          liveEditHandleDragRef.current = { ...drag, last: world, moved: true };
           return;
         }
-        if (props.dragState) {
-          const drag = props.dragState;
-          const dx = round(world[0] - drag.last[0]);
-          const dz = round(world[1] - drag.last[1]);
-          if (dx === 0 && dz === 0) return;
-          props.onUpdateLevel((current) => moveSelection(current, drag.selection, dx, dz));
-          props.onDragState({ ...drag, last: world, moved: true });
+        if (liveDragRef.current) {
+          const drag = liveDragRef.current;
+          const dx = round(world[0] - drag.start[0]);
+          const dz = round(world[1] - drag.start[1]);
+          if (dx === drag.dx && dz === drag.dz) return;
+          liveDragRef.current = { ...drag, last: world, dx, dz, moved: dx !== 0 || dz !== 0 };
+          applyLiveDrag(event.currentTarget, liveDragRef.current);
         }
       }}
-      onPointerUp={() => {
-        props.onDragState(null);
-        props.onEditHandleDragState(null);
+      onPointerUp={(event) => {
+        const drag = liveDragRef.current;
+        if (drag?.moved) {
+          clearLiveDrag(event.currentTarget, drag.selection);
+          props.onUpdateLevel((current) => moveSelection(current, drag.selection, drag.dx, drag.dz));
+        }
+        liveDragRef.current = null;
+        liveEditHandleDragRef.current = null;
         props.onReleaseViewport();
       }}
-      onPointerCancel={() => {
-        props.onDragState(null);
-        props.onEditHandleDragState(null);
+      onPointerCancel={(event) => {
+        if (liveDragRef.current) clearLiveDrag(event.currentTarget, liveDragRef.current.selection);
+        liveDragRef.current = null;
+        liveEditHandleDragRef.current = null;
         props.onReleaseViewport();
       }}
       onContextMenu={(event) => {
@@ -144,6 +165,39 @@ export function Viewport(props: Props) {
       <SelectionHandles level={level} selection={props.selection} />
     </svg>
   );
+}
+
+function applyLiveDrag(svg: SVGSVGElement, drag: LiveDragState) {
+  const transform = drag.moved ? `translate(${drag.dx} ${drag.dz})` : "";
+  setLiveTransform(findSelectionElement(svg, drag.selection), transform);
+  setLiveTransform(svg.querySelector<SVGGElement>(".edit-handles") ?? undefined, transform);
+}
+
+function clearLiveDrag(svg: SVGSVGElement, selection: Selection) {
+  restoreLiveTransform(findSelectionElement(svg, selection));
+  restoreLiveTransform(svg.querySelector<SVGGElement>(".edit-handles") ?? undefined);
+}
+
+function findSelectionElement(svg: SVGSVGElement, selection: Selection): SVGGraphicsElement | undefined {
+  const key = selectionKey(selection);
+  return Array.from(svg.querySelectorAll<SVGGraphicsElement>("[data-selection-key]")).find((element) => element.dataset.selectionKey === key);
+}
+
+function setLiveTransform(element: SVGGraphicsElement | undefined, transform: string) {
+  if (!element) return;
+  if (element.dataset.liveBaseTransform === undefined) element.dataset.liveBaseTransform = element.getAttribute("transform") ?? "";
+  const base = element.dataset.liveBaseTransform;
+  const next = [transform, base].filter(Boolean).join(" ");
+  if (next) element.setAttribute("transform", next);
+  else element.removeAttribute("transform");
+}
+
+function restoreLiveTransform(element: SVGGraphicsElement | undefined) {
+  if (!element || element.dataset.liveBaseTransform === undefined) return;
+  const base = element.dataset.liveBaseTransform;
+  if (base) element.setAttribute("transform", base);
+  else element.removeAttribute("transform");
+  delete element.dataset.liveBaseTransform;
 }
 
 function moveEditHandle(level: LevelV1, item: Selection, handle: string, index: number | undefined, world: Point2, dx: number, dz: number): LevelV1 {

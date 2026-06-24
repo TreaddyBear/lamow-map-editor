@@ -5,7 +5,7 @@ import { exportJsonValue, importJsonText } from "../domain/importExport";
 import { clone, defaultPack, type Area, type CanvasTool, type DirtPath, type Fence, type HeightFeature, type LevelV1, type MapPackV1, type PathTool, type Point2, type Road, type Selection } from "../domain/model";
 import { normalizePack } from "../domain/normalization";
 import { validateLevel } from "../domain/validation";
-import type { DragState, EditHandleDragState, EditorState, SidebarPanes } from "../editor/types";
+import type { EditorState, SidebarPanes } from "../editor/types";
 import { addAreaToLevel, collectUniqueId, currentLevel, getBounds, removeAreaAtPath, removeArrayItem, sameSelection, updateAreasAtPath, updateArray, updateCurrentLevel } from "../editor/utils";
 import { ContextMenu } from "./ContextMenu";
 import { ImportExportPane } from "./ImportExportPane";
@@ -30,8 +30,6 @@ export function App() {
     activeViewportBounds: null,
   }));
   const [history, setHistory] = useState<MapPackV1[]>([]);
-  const [dragState, setDragState] = useState<DragState>(null);
-  const [editHandleDragState, setEditHandleDragState] = useState<EditHandleDragState>(null);
 
   const level = currentLevel(state.pack, state.selectedLevelIndex);
   const validation = useMemo(() => validateLevel(state.pack, level), [state.pack, level]);
@@ -164,7 +162,7 @@ export function App() {
           </ActionRow>
         </div>
         <div className="map-wrap">
-          <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} dragState={dragState} editHandleDragState={editHandleDragState} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater) => updateLevel(updater, false)} onDragState={setDragState} onEditHandleDragState={setEditHandleDragState} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
+          <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater) => updateLevel(updater, false)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
         </div>
         <div className="status">{validation.length === 0 ? <div className="ok">Draft v1 shape validates for the checks currently implemented.</div> : validation.map((error) => <div key={error} className="error">{error}</div>)}</div>
       </section>

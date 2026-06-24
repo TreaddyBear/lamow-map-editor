@@ -5,13 +5,14 @@ import { selectAttrs } from "./svgHelpers";
 
 export function AreaSvg({ area, path, selection }: { area: Area; path: number[]; selection: Selection }) {
   const selected = sameSelection(selection, { kind: "area", path });
+  const select = selectAttrs({ kind: "area", path });
   const fill = area.role === "bed" || area.surface === "dirt" ? "#8a5d3b" : area.composition === "additive" ? "#e4c94a" : area.role === "background" ? "#9dc58d" : "#69a957";
   const stroke = selected ? "#2563eb" : area.role === "bed" || area.surface === "dirt" ? "#55351f" : area.composition === "additive" ? "#b18f1d" : "#315f2b";
   return (
-    <>
-      <ShapeSvg shape={area.shape} attrs={{ ...selectAttrs({ kind: "area", path }), className: `map-object ${selected ? "selected-object" : ""}`, fill, opacity: area.composition === "additive" ? 0.42 : area.role === "background" ? 0.24 : 0.68, stroke, strokeWidth: selected ? 0.08 : 0.06 }} />
+    <g {...select} className="map-object">
+      <ShapeSvg shape={area.shape} attrs={{ ...select, className: selected ? "selected-object" : "", fill, opacity: area.composition === "additive" ? 0.42 : area.role === "background" ? 0.24 : 0.68, stroke, strokeWidth: selected ? 0.08 : 0.06 }} />
       {(area.children ?? []).map((child, index) => <AreaSvg key={`${child.id}-${index}`} area={child} path={[...path, index]} selection={selection} />)}
-    </>
+    </g>
   );
 }
 
