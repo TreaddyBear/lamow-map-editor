@@ -7,13 +7,14 @@ import { normalizePack } from "../domain/normalization";
 import { validateLevel } from "../domain/validation";
 import type { EditorState, SidebarPanes } from "../editor/types";
 import { addAreaToLevel, collectUniqueId, currentLevel, getBounds, removeAreaAtPath, removeArrayItem, sameSelection, updateAreasAtPath, updateArray, updateCurrentLevel } from "../editor/utils";
+import { AppTopBar } from "./AppTopBar";
 import { ContextMenu } from "./ContextMenu";
 import { ImportExportPane } from "./ImportExportPane";
 import { Inspector } from "./Inspector";
 import { Sidebar } from "./Sidebar";
 import { SnapControls } from "./SnapControls";
-import { ActionRow, Button } from "./ui";
 import { Viewport } from "./Viewport";
+import { ViewportToolbar } from "./ViewportToolbar";
 
 export function App() {
   const [state, setState] = useState<EditorState>(() => ({
@@ -133,21 +134,47 @@ export function App() {
       return;
     }
     addPathItem(kind, state.pendingPath.start, point);
-    setState((current) => ({ ...current, pendingPath: null, canvasTool: "select" }));
+    setState((current) => ({ ...current, pendingPath: null, canvasTool: kind }));
+  };
+
+  const undo = () => {
+    const previous = history.at(-1);
+    if (!previous) return;
+    setRedoHistory((items) => [...items, clone(state.pack)].slice(-100));
+    setHistory((items) => items.slice(0, -1));
+    setState((current) => ({ ...current, pack: previous, selection: { kind: "level" }, importMessage: "Undid last edit." }));
+  };
+
+  const redo = () => {
+    const next = redoHistory.at(-1);
+    if (!next) return;
+    setHistory((items) => [...items, clone(state.pack)].slice(-100));
+    setRedoHistory((items) => items.slice(0, -1));
+    setState((current) => ({ ...current, pack: next, selection: { kind: "level" }, importMessage: "Redid last edit." }));
+  };
+
+  const setCanvasTool = (tool: CanvasTool) => {
+    if (tool === "spawn") {
+      setState((current) => ({ ...current, selection: { kind: "spawn" }, canvasTool: "select", pendingPath: null }));
+      return;
+    }
+    setState((current) => ({ ...current, canvasTool: tool, pendingPath: tool !== current.pendingPath?.kind ? null : current.pendingPath }));
   };
 
   return (
     <main className={`app ${state.sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${state.importPanelOpen ? "import-is-open" : ""}`}>
+      <AppTopBar
+        sidebarCollapsed={state.sidebarCollapsed}
+        rightSidebarOpen={state.importPanelOpen}
+        canUndo={history.length > 0}
+        canRedo={redoHistory.length > 0}
+        onToggleSidebar={() => setState((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }))}
+        onToggleRightSidebar={() => setState((current) => ({ ...current, importPanelOpen: !current.importPanelOpen }))}
+        onUndo={undo}
+        onRedo={redo}
+        onReset={() => record((current) => ({ ...current, pack: clone(defaultPack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: "" }))}
+      />
       <aside className={`panel sidebar-panel ${state.sidebarCollapsed ? "collapsed" : ""}`}>
-        <div className="panel-header">
-          <h1>LaMow Map Editor</h1>
-          <ActionRow>
-            <Button type="button" onClick={() => setState((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }))}>{state.sidebarCollapsed ? "Show" : "Hide"}</Button>
-            <Button type="button" disabled={history.length === 0} onClick={() => { const previous = history.at(-1); if (previous) { setRedoHistory((items) => [...items, clone(state.pack)].slice(-100)); setHistory((items) => items.slice(0, -1)); setState((current) => ({ ...current, pack: previous, selection: { kind: "level" }, importMessage: "Undid last edit." })); } }}>Undo</Button>
-            <Button type="button" disabled={redoHistory.length === 0} onClick={() => { const next = redoHistory.at(-1); if (next) { setHistory((items) => [...items, clone(state.pack)].slice(-100)); setRedoHistory((items) => items.slice(0, -1)); setState((current) => ({ ...current, pack: next, selection: { kind: "level" }, importMessage: "Redid last edit." })); } }}>Redo</Button>
-            <Button type="button" onClick={() => record((current) => ({ ...current, pack: clone(defaultPack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: "" }))}>Reset</Button>
-          </ActionRow>
-        </div>
         <Sidebar
           level={level}
           selection={state.selection}
@@ -162,13 +189,7 @@ export function App() {
         />
       </aside>
       <section className="panel canvas-panel">
-        <div className="panel-header">
-          <h2>Top-down preview</h2>
-          <ActionRow className="toolbar-actions">
-            {(["select", "spawn", "area", "fence", "road", "dirtPath", "hill"] as CanvasTool[]).map((tool) => <Button key={tool} tone={state.canvasTool === tool ? "primary" : "default"} type="button" onClick={() => setState((current) => ({ ...current, canvasTool: tool, pendingPath: tool !== current.pendingPath?.kind ? null : current.pendingPath }))}>{tool === "dirtPath" ? "Path" : tool}</Button>)}
-            <Button type="button" tone={state.importPanelOpen ? "primary" : "default"} onClick={() => setState((current) => ({ ...current, importPanelOpen: !current.importPanelOpen }))}>Import / Export</Button>
-          </ActionRow>
-        </div>
+        <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} />
         <div className="map-wrap">
           <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
           <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
@@ -179,7 +200,6 @@ export function App() {
         <aside className="panel import-panel">
           <div className="panel-header">
             <h2>Import / Export</h2>
-            <Button type="button" onClick={() => setState((current) => ({ ...current, importPanelOpen: false }))}>Hide</Button>
           </div>
           <ImportExportPane pack={state.pack} value={jsonValue} message={state.importMessage} onJsonText={(jsonText) => setState((current) => ({ ...current, jsonText }))} onCopy={() => navigator.clipboard.writeText(jsonValue).then(() => setState((current) => ({ ...current, importMessage: "Copied JSON to clipboard." })))} onImport={() => { try { const result = importJsonText(jsonValue); record((current) => ({ ...current, pack: normalizePack(result.pack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: result.message })); } catch (error) { setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON." })); } }} onOpenFile={(file) => file.text().then((text) => { const result = importJsonText(text); record((current) => ({ ...current, pack: normalizePack(result.pack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: result.message })); }).catch((error) => setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON file." })))} />
         </aside>
