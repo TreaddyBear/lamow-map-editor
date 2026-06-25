@@ -105,6 +105,13 @@ export function App() {
       return { ...current, dirtPaths: [...current.dirtPaths, { id: nextId("dirtPath"), kind: "dirtPath", width: 1.1, shape: { type: "line", start, end } } satisfies DirtPath] };
     });
   };
+  const addFenceSegment = (point: Point2): boolean => {
+    if (state.selection.kind !== "fence" || state.selection.index === undefined) return false;
+    const fence = level.fences[state.selection.index];
+    if (!fence || fenceClosed(fence)) return false;
+    updateLevel((current) => ({ ...current, fences: updateArray(current.fences, state.selection.index!, appendFencePoint(current.fences[state.selection.index!], point)) }));
+    return true;
+  };
   const addHill = (point: Point2) => {
     updateLevel((current) => ({ ...current, terrain: { heightFeatures: [...current.terrain.heightFeatures, { id: nextId("hill"), type: "hill", shape: { type: "circle", center: point, radius: 4 }, height: 1.5, falloff: 1 } satisfies HeightFeature] } }));
   };
@@ -128,9 +135,21 @@ export function App() {
     else addPathItem("fence", [-4, -4], [4, -4]);
   };
 
+  const currentLevelFromState = (editorState: EditorState) => currentLevel(editorState.pack, editorState.selectedLevelIndex);
+
   const pathToolClick = (kind: PathTool, point: Point2) => {
+    if (kind === "fence" && addFenceSegment(point)) return;
     if (!state.pendingPath || state.pendingPath.kind !== kind) {
       setState((current) => ({ ...current, pendingPath: { kind, start: point }, canvasTool: kind }));
+      return;
+    }
+    if (kind === "fence") {
+      record((current) => {
+        const currentLevel = currentLevelFromState(current);
+        const fence: Fence = { id: collectUniqueId(currentLevel, "fence"), kind: "fence", height: 1, postSpacing: 2, shape: { type: "line", start: current.pendingPath!.start, end: point } };
+        const index = currentLevel.fences.length;
+        return { ...current, pack: updateCurrentLevel(current.pack, current.selectedLevelIndex, (level) => ({ ...level, fences: [...level.fences, fence] })), selection: { kind: "fence", index }, pendingPath: null, canvasTool: kind, jsonText: "" };
+      });
       return;
     }
     addPathItem(kind, state.pendingPath.start, point);
@@ -207,4 +226,23 @@ export function App() {
       <ContextMenu menu={state.contextMenu} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} onClose={() => setState((current) => ({ ...current, contextMenu: null }))} onSelect={(selection: Selection) => setState((current) => ({ ...current, selection, contextMenu: null }))} onDuplicate={duplicateSelection} onDelete={(selection) => deleteSelection(selection)} onMoveSpawn={() => state.contextMenu && updateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: state.contextMenu!.world } }))} onAddArea={() => state.contextMenu && addArea(state.contextMenu.world)} onAddChildArea={() => state.contextMenu && addArea(state.contextMenu.world, state.contextMenu.target?.kind === "area" ? state.contextMenu.target.path : state.selection.kind === "area" ? state.selection.path : undefined)} onAddBlueprint={(key) => state.contextMenu && addBlueprint(key, state.contextMenu.world)} onStartFence={() => state.contextMenu && pathToolClick("fence", state.contextMenu.world)} onAddRoad={() => state.contextMenu && addPathItem("road", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddDirtPath={() => state.contextMenu && addPathItem("dirtPath", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddHill={() => state.contextMenu && addHill(state.contextMenu.world)} />
     </main>
   );
+}
+
+function fenceClosed(fence: Fence): boolean {
+  const points = fencePoints(fence);
+  const first = points[0];
+  const last = points.at(-1);
+  return Boolean(first && last && points.length > 2 && first[0] === last[0] && first[1] === last[1]);
+}
+
+function appendFencePoint(fence: Fence, point: Point2): Fence {
+  if (fence.shape.type === "line") return { ...fence, shape: { type: "polyline", points: [fence.shape.start, fence.shape.end, point] } };
+  if (fence.shape.type === "polyline") return { ...fence, shape: { ...fence.shape, points: [...fence.shape.points, point] } };
+  return { ...fence, shape: { type: "polyline", points: [fence.shape.start, ...fence.shape.curves.map((curve) => curve.end), point] } };
+}
+
+function fencePoints(fence: Fence): Point2[] {
+  if (fence.shape.type === "line") return [fence.shape.start, fence.shape.end];
+  if (fence.shape.type === "polyline") return fence.shape.points;
+  return [fence.shape.start, ...fence.shape.curves.map((curve) => curve.end)];
 }

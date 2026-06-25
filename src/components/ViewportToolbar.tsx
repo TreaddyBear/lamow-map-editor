@@ -1,3 +1,4 @@
+import { Fence as FenceIcon, Mountain, MousePointer2, Plus, Route, Square, Waypoints } from "lucide-react";
 import { areaBlueprints } from "../domain/blueprints";
 import type { CanvasTool } from "../domain/model";
 import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator } from "./ui";
@@ -15,27 +16,23 @@ export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, onTool, o
   return (
     <div className="viewport-toolbar">
       <ActionRow>
-        <Menu trigger={<Button type="button">Add</Button>}>
-          <MenuItem onSelect={() => onAdd("area")}>Lawn area</MenuItem>
-          <MenuItem onSelect={() => onAdd("hill")}>Hill</MenuItem>
-          <MenuItem onSelect={() => onAdd("road")}>Road</MenuItem>
-          <MenuItem onSelect={() => onAdd("dirtPath")}>Dirt path</MenuItem>
-          <MenuItem onSelect={() => onAdd("fence")}>Fence</MenuItem>
+        <Button className="icon-button" tone={activeTool === "select" ? "primary" : "default"} type="button" title="Select" onClick={() => onTool("select")}><MousePointer2 /></Button>
+        <Menu trigger={<Button className="icon-button" type="button" title="Add"><Plus /></Button>}>
+          <MenuItem onSelect={() => onAdd("area")}><span className="menu-item-icon"><Square />Lawn area</span></MenuItem>
+          <MenuItem onSelect={() => onAdd("hill")}><span className="menu-item-icon"><Mountain />Hill</span></MenuItem>
+          <MenuItem onSelect={() => onAdd("road")}><span className="menu-item-icon"><Route />Road</span></MenuItem>
+          <MenuItem onSelect={() => onAdd("dirtPath")}><span className="menu-item-icon"><Waypoints />Dirt path</span></MenuItem>
+          <MenuItem onSelect={() => onAdd("fence")}><span className="menu-item-icon"><FenceIcon />Fence</span></MenuItem>
           {pinned.length > 0 ? <MenuSeparator /> : null}
           {pinned.length > 0 ? <MenuLabel>Pinned blueprints</MenuLabel> : null}
           {pinned.map((blueprint) => <MenuItem key={blueprint.key} onSelect={() => onAddBlueprintAtOrigin(blueprint.key)}>{blueprint.label}</MenuItem>)}
         </Menu>
-        <Menu trigger={<Button type="button">Tools</Button>}>
-          {(["select", "area", "fence", "road", "dirtPath", "hill"] as CanvasTool[]).map((tool) => <MenuItem key={tool} onSelect={() => onTool(tool)}>{toolLabel(tool)}{activeTool === tool ? " *" : ""}</MenuItem>)}
-          <MenuSeparator />
-          <MenuItem onSelect={() => onTool("spawn")}>Select spawn</MenuItem>
-        </Menu>
+        <Button className="icon-button" tone={activeTool === "area" ? "primary" : "default"} type="button" title="Add areas by clicking" onClick={() => onTool("area")}><Square /></Button>
+        <Button className="icon-button" tone={activeTool === "fence" ? "primary" : "default"} type="button" title="Draw fence" onClick={() => onTool("fence")}><FenceIcon /></Button>
+        <Button className="icon-button" tone={activeTool === "road" ? "primary" : "default"} type="button" title="Draw road" onClick={() => onTool("road")}><Route /></Button>
+        <Button className="icon-button" tone={activeTool === "dirtPath" ? "primary" : "default"} type="button" title="Draw dirt path" onClick={() => onTool("dirtPath")}><Waypoints /></Button>
+        <Button className="icon-button" tone={activeTool === "hill" ? "primary" : "default"} type="button" title="Add hills by clicking" onClick={() => onTool("hill")}><Mountain /></Button>
       </ActionRow>
     </div>
   );
-}
-
-function toolLabel(tool: CanvasTool): string {
-  if (tool === "dirtPath") return "Dirt path";
-  return `${tool.charAt(0).toUpperCase()}${tool.slice(1)}`;
 }
