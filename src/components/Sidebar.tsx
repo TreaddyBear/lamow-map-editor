@@ -61,8 +61,9 @@ function TreeFolder({ label, onAdd }: { label: string; onAdd: () => void }) {
 }
 
 function TreeButton({ item, active, icon, label, onSelect, onDelete, depth = 1 }: { item: Selection; active: boolean; icon: string; label: string; onSelect: (selection: Selection) => void; onDelete?: (selection: Selection) => void; depth?: number }) {
+  const depthClass = `tree-depth-${Math.min(depth, 8)}`;
   return (
-    <div className={`tree-row ${active ? "active" : ""}`} style={{ "--depth": depth } as React.CSSProperties}>
+    <div className={`tree-row ${depthClass} ${active ? "active" : ""}`}>
       <button className="tree-item" type="button" onClick={() => onSelect(item)}>
         <span className="tree-icon">{icon}</span>
         <span>{label}</span>

@@ -10,7 +10,7 @@ export function Button({ tone = "default", className = "", ...props }: ButtonPro
 }
 
 export function ActionRow({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={["json-actions", className].filter(Boolean).join(" ")}>{children}</div>;
+  return <div className={["action-row", className].filter(Boolean).join(" ")}>{children}</div>;
 }
 
 export function FileButton({ children, accept, onFile }: { children: ReactNode; accept: string; onFile: (file: File) => void }) {

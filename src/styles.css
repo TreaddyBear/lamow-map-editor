@@ -79,10 +79,6 @@ textarea {
   padding: 0.5rem 0.55rem;
 }
 
-.compact-select {
-  padding-block: 0.3rem;
-}
-
 textarea {
   min-height: 14rem;
   resize: vertical;
@@ -192,12 +188,6 @@ textarea {
   gap: 0.65rem;
 }
 
-.four {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
 label {
   display: grid;
   gap: 0.25rem;
@@ -229,18 +219,6 @@ label {
   border-radius: 8px;
   background: #ffffff;
   padding: 0.75rem;
-}
-
-.item-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.65rem;
-}
-
-.item-head strong {
-  font-size: 0.85rem;
 }
 
 .sidebar-panel {
@@ -336,7 +314,7 @@ label {
 .tree-row::before {
   content: "";
   position: absolute;
-  left: calc(0.92rem + (var(--depth) * 1rem));
+  left: var(--tree-line-offset);
   top: -1px;
   bottom: -1px;
   border-left: 1px solid #d2dfcc;
@@ -346,7 +324,7 @@ label {
 .tree-row::after {
   content: "";
   position: absolute;
-  left: calc(0.92rem + (var(--depth) * 1rem));
+  left: var(--tree-line-offset);
   top: 50%;
   width: 0.55rem;
   border-top: 1px solid #d2dfcc;
@@ -367,10 +345,50 @@ label {
   border-radius: 4px;
   background: transparent;
   font-weight: 550;
-  padding: 0.24rem 0.32rem 0.24rem calc(0.32rem + (var(--depth) * 1rem));
+  padding: 0.24rem 0.32rem 0.24rem var(--tree-item-indent);
   text-align: left;
   position: relative;
   z-index: 1;
+}
+
+.tree-depth-1 {
+  --tree-line-offset: 1.92rem;
+  --tree-item-indent: 1.32rem;
+}
+
+.tree-depth-2 {
+  --tree-line-offset: 2.92rem;
+  --tree-item-indent: 2.32rem;
+}
+
+.tree-depth-3 {
+  --tree-line-offset: 3.92rem;
+  --tree-item-indent: 3.32rem;
+}
+
+.tree-depth-4 {
+  --tree-line-offset: 4.92rem;
+  --tree-item-indent: 4.32rem;
+}
+
+.tree-depth-5 {
+  --tree-line-offset: 5.92rem;
+  --tree-item-indent: 5.32rem;
+}
+
+.tree-depth-6 {
+  --tree-line-offset: 6.92rem;
+  --tree-item-indent: 6.32rem;
+}
+
+.tree-depth-7 {
+  --tree-line-offset: 7.92rem;
+  --tree-item-indent: 7.32rem;
+}
+
+.tree-depth-8 {
+  --tree-line-offset: 8.92rem;
+  --tree-item-indent: 8.32rem;
 }
 
 .tree-action {
@@ -435,7 +453,7 @@ label {
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  padding: 0.42rem 0.25rem 0.12rem calc(0.25rem + (var(--depth) * 1rem));
+  padding: 0.42rem 0.25rem 0.12rem 0.25rem;
   text-transform: uppercase;
 }
 
@@ -443,22 +461,6 @@ label {
   width: 0.85rem;
   height: 0.85rem;
   stroke-width: 2.4;
-}
-
-.map-object {
-  cursor: grab;
-}
-
-.map-board {
-  cursor: default;
-}
-
-.map-board:active {
-  cursor: grabbing;
-}
-
-.map-object:active {
-  cursor: grabbing;
 }
 
 .selected-object {
@@ -576,22 +578,6 @@ label {
   margin: 0.15rem 0;
 }
 
-.context-crosshair {
-  pointer-events: none;
-}
-
-.context-crosshair line {
-  stroke: #1d4ed8;
-  stroke-width: 0.09;
-  stroke-linecap: round;
-}
-
-.context-crosshair circle {
-  fill: #ffffff;
-  stroke: #1d4ed8;
-  stroke-width: 0.07;
-}
-
 .danger {
   color: #9b2424;
   border-color: #e2b4b4;
@@ -689,6 +675,16 @@ label {
   border: 1px solid #b8c9b2;
   border-radius: 8px;
   background: #dbe8d5;
+  cursor: default;
+}
+
+.map-board:active,
+.map-object:active {
+  cursor: grabbing;
+}
+
+.map-object {
+  cursor: grab;
 }
 
 .snap-widget {
@@ -951,37 +947,10 @@ label {
   color: #8b2821;
 }
 
-.json-actions {
+.action-row {
   display: flex;
   gap: 0.55rem;
   flex-wrap: wrap;
-}
-
-.drop-zone {
-  border: 1px dashed #8ead82;
-  border-radius: 8px;
-  background: #f1f7ee;
-  color: #40543d;
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.8rem;
-}
-
-.drop-zone.dragging {
-  background: #e1f2da;
-  border-color: #2f6f34;
-}
-
-.drop-zone strong {
-  color: #1c321d;
-}
-
-.preview-meta {
-  display: flex;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-  color: #53644f;
-  font-size: 0.84rem;
 }
 
 @media (max-width: 1180px) {
