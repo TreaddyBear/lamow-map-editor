@@ -37,10 +37,6 @@ button {
   @apply cursor-pointer rounded-md border border-[#9eb397] bg-white px-3 py-2 font-semibold text-[#162216];
 }
 
-.file-button {
-  @apply w-auto cursor-pointer rounded-md border border-[#9eb397] bg-white px-3 py-2 text-base font-semibold text-[#162216];
-}
-
 button:hover {
   @apply bg-[#f2f8ef];
 }
@@ -534,28 +530,6 @@ label {
   align-items: center;
 }
 
-.menu-content {
-  z-index: 20;
-  min-width: 12rem;
-  display: grid;
-  gap: 0.15rem;
-  border: 1px solid #9eb397;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 12px 30px rgb(31 49 27 / 18%);
-  padding: 0.35rem;
-}
-
-.menu-item {
-  outline: none;
-  border-radius: 5px;
-  color: #162216;
-  cursor: pointer;
-  font-size: 0.86rem;
-  font-weight: 650;
-  padding: 0.48rem 0.6rem;
-}
-
 .menu-item-icon {
   display: grid;
   grid-template-columns: 1rem minmax(0, 1fr);
@@ -567,30 +541,6 @@ label {
   width: 1rem;
   height: 1rem;
   stroke-width: 2.2;
-}
-
-.menu-item[data-highlighted] {
-  background: #edf6e9;
-}
-
-.menu-item[data-disabled] {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.menu-label {
-  color: #61715d;
-  font-size: 0.68rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  padding: 0.25rem 0.6rem 0.1rem;
-  text-transform: uppercase;
-}
-
-.menu-separator {
-  height: 1px;
-  background: #dbe8d5;
-  margin: 0.15rem 0;
 }
 
 .map-wrap {
@@ -656,10 +606,6 @@ label {
   background: rgb(248 251 246 / 97%);
   box-shadow: 0 12px 30px rgb(31 49 27 / 16%);
   padding: 0.65rem;
-}
-
-.popover-content {
-  z-index: 25;
 }
 
 .zoom-widget {
@@ -734,7 +680,7 @@ label {
 }
 
 .io-actions button,
-.io-actions .file-button {
+.io-actions label {
   min-height: 0;
   font-size: 0.82rem;
   line-height: 1.1;
@@ -770,50 +716,6 @@ label {
   line-height: 1.35;
 }
 
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  background: rgb(20 32 22 / 28%);
-}
-
-.dialog-panel {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  z-index: 31;
-  transform: translate(-50%, -50%);
-  width: min(28rem, calc(100vw - 2rem));
-  max-height: min(34rem, calc(100vh - 2rem));
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  border: 1px solid #b8c9b2;
-  border-radius: 8px;
-  background: #f8fbf6;
-  box-shadow: 0 18px 60px rgb(31 49 27 / 24%);
-  overflow: hidden;
-}
-
-.dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-bottom: 1px solid #d8e3d3;
-  padding: 0.65rem 0.75rem;
-}
-
-.dialog-header h2 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.dialog-header [data-radix-dialog-title] {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 800;
-}
-
 .theme-dark {
   color: #dcebdd;
   background: #111a12;
@@ -821,8 +723,6 @@ label {
 
 .theme-dark .panel,
 .theme-dark .app-topbar,
-.theme-dark .dialog-panel,
-.theme-dark .menu-content,
 .theme-dark .raw-json-pane,
 .theme-dark .item {
   border-color: #375033;
@@ -830,7 +730,6 @@ label {
 }
 
 .theme-dark button,
-.theme-dark .file-button,
 .theme-dark input,
 .theme-dark select,
 .theme-dark textarea {
@@ -876,12 +775,6 @@ label {
 .error {
   background: #fff0ed;
   color: #8b2821;
-}
-
-.action-row {
-  display: flex;
-  gap: 0.55rem;
-  flex-wrap: wrap;
 }
 
 @media (max-width: 1180px) {

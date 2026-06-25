@@ -14,7 +14,7 @@ export function Popover({ trigger, children, open, onOpenChange, align = "start"
     <RadixPopover.Root open={open} onOpenChange={onOpenChange}>
       <RadixPopover.Trigger asChild>{trigger}</RadixPopover.Trigger>
       <RadixPopover.Portal>
-        <RadixPopover.Content className="popover-content" align={align} sideOffset={6}>
+        <RadixPopover.Content className="z-[25]" align={align} sideOffset={6}>
           {children}
         </RadixPopover.Content>
       </RadixPopover.Portal>
