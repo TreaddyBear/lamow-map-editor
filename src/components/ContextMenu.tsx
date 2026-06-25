@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
-import { areaBlueprints } from "../domain/blueprints";
-import type { ContextMenuState, Selection } from "../domain/model";
+import { allBlueprintOptions } from "../domain/blueprints";
+import type { ContextMenuState, EditorBlueprint, Selection } from "../domain/model";
 import { Button } from "./ui";
 
-export function ContextMenu({ menu, pinnedAreaBlueprintKeys, onClose, onSelect, onDuplicate, onDelete, onMoveSpawn, onAddArea, onAddChildArea, onAddBlueprint, onStartFence, onAddRoad, onAddDirtPath, onAddHill }: {
+export function ContextMenu({ menu, pinnedAreaBlueprintKeys, customBlueprints, onClose, onSelect, onDuplicate, onDelete, onMoveSpawn, onAddArea, onAddChildArea, onAddBlueprint, onStartFence, onAddRoad, onAddDirtPath, onAddHill }: {
   menu: ContextMenuState;
   pinnedAreaBlueprintKeys: string[];
+  customBlueprints: EditorBlueprint[];
   onClose: () => void;
   onSelect: (selection: Selection) => void;
   onDuplicate: (selection: Selection) => void;
@@ -30,7 +31,8 @@ export function ContextMenu({ menu, pinnedAreaBlueprintKeys, onClose, onSelect, 
   }, [menu, onClose]);
 
   if (!menu) return null;
-  const pinned = pinnedAreaBlueprintKeys.map((key) => areaBlueprints.find((item) => item.key === key)).filter((item): item is (typeof areaBlueprints)[number] => Boolean(item));
+  const blueprints = allBlueprintOptions(customBlueprints);
+  const pinned = pinnedAreaBlueprintKeys.map((key) => blueprints.find((item) => item.key === key)).filter((item): item is (typeof blueprints)[number] => Boolean(item));
   return (
     <div ref={ref} id="context-menu" className="context-menu" style={{ left: menu.screenX, top: menu.screenY }}>
       {menu.target ? <Button type="button" onClick={() => onSelect(menu.target!)}>Select target</Button> : null}
@@ -46,7 +48,7 @@ export function ContextMenu({ menu, pinnedAreaBlueprintKeys, onClose, onSelect, 
         {pinned.length > 0 ? <div className="context-label">Pinned</div> : null}
         {pinned.map((blueprint) => <Button key={`pinned-${blueprint.key}`} type="button" onClick={() => onAddBlueprint(blueprint.key)}>{blueprint.label}</Button>)}
         {pinned.length > 0 ? <div className="context-label">All blueprints</div> : null}
-        {areaBlueprints.map((blueprint) => <Button key={blueprint.key} type="button" onClick={() => onAddBlueprint(blueprint.key)}>{blueprint.label}</Button>)}
+        {blueprints.map((blueprint) => <Button key={blueprint.key} type="button" onClick={() => onAddBlueprint(blueprint.key)}>{blueprint.label}</Button>)}
         <Button type="button" onClick={onStartFence}>Start fence at crosshair</Button>
         <Button type="button" onClick={onAddRoad}>Short road here</Button>
         <Button type="button" onClick={onAddDirtPath}>Short dirt path here</Button>

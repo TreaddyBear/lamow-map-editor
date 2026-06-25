@@ -1,12 +1,16 @@
+import type { SamplePack } from "../domain/samplePacks";
 import type { MapPackV1 } from "../domain/model";
-import { ActionRow, Button, FileButton } from "./ui";
+import { ActionRow, Button, FileButton, Menu, MenuItem } from "./ui";
 
-export function ImportExportPane({ value, message, onJsonText, onCopy, onDownload, onLoadJson, onOpenFile, onRevert }: { value: string; message: string; pack: MapPackV1; onJsonText: (value: string) => void; onCopy: () => void; onDownload: () => void; onLoadJson: () => void; onOpenFile: (file: File) => void; onRevert: () => void }) {
+export function ImportExportPane({ value, message, samples, onJsonText, onCopy, onDownload, onLoadJson, onOpenFile, onRevert, onLoadSample }: { value: string; message: string; pack: MapPackV1; samples: SamplePack[]; onJsonText: (value: string) => void; onCopy: () => void; onDownload: () => void; onLoadJson: () => void; onOpenFile: (file: File) => void; onRevert: () => void; onLoadSample: (key: string) => void }) {
   return (
     <div className="panel-body stack">
       <ActionRow className="io-actions">
         <FileButton accept="application/json,.json,.txt,text/plain" onFile={onOpenFile}>Import</FileButton>
         <Button tone="primary" type="button" onClick={onDownload}>Export</Button>
+        <Menu trigger={<Button type="button">Samples</Button>}>
+          {samples.map((sample) => <MenuItem key={sample.key} onSelect={() => onLoadSample(sample.key)}>{sample.label}</MenuItem>)}
+        </Menu>
         <Button type="button" onClick={onCopy}>Copy JSON</Button>
         <Button type="button" onClick={onRevert}>Revert</Button>
       </ActionRow>
@@ -17,7 +21,7 @@ export function ImportExportPane({ value, message, onJsonText, onCopy, onDownloa
           <Button type="button" onClick={onLoadJson}>Load pasted JSON</Button>
         </div>
       </details>
-      {message ? <div className={["Imported", "Copied", "Exported", "Reverted"].some((word) => message.startsWith(word)) ? "ok" : "error"}>{message}</div> : null}
+      {message ? <div className={["Imported", "Copied", "Exported", "Reverted", "Loaded"].some((word) => message.startsWith(word)) ? "ok" : "error"}>{message}</div> : null}
     </div>
   );
 }

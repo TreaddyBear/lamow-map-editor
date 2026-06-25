@@ -20,12 +20,25 @@ export type PackInfo = {
   name: string;
 };
 
+export type EditorBlueprint = {
+  key: string;
+  label: string;
+  baseId: string;
+  area: Area;
+};
+
+export type EditorMetadata = {
+  blueprints?: EditorBlueprint[];
+  theme?: "light" | "dark";
+};
+
 export type MapPackV1 = {
   version: 1;
   units: "meters";
   coordinates?: CoordinateMetadata;
   pack: PackInfo;
   levels: LevelV1[];
+  editor?: EditorMetadata;
 };
 
 export type LevelV1 = {
@@ -226,6 +239,10 @@ export const defaultPack: MapPackV1 = {
   units: "meters",
   coordinates: defaultCoordinates,
   pack: { prefix: "bgrn", name: "Beta Green" },
+  editor: {
+    blueprints: [],
+    theme: "light",
+  },
   levels: [
     {
       code: "ell",

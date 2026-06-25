@@ -3,6 +3,8 @@ import type {
   AreaShape,
   DirtPath,
   Distribution,
+  EditorBlueprint,
+  EditorMetadata,
   Fence,
   FoliageType,
   HeightFeature,
@@ -37,7 +39,26 @@ export function normalizePack(value: MapPackV1): MapPackV1 {
       prefix: value.pack?.prefix ?? "bgrn",
       name: value.pack?.name ?? "Beta Green",
     },
+    editor: normalizeEditorMetadata(value.editor),
     levels: (value.levels?.length ? value.levels : [clone(defaultPack.levels[0])]).map(normalizeLevel),
+  };
+}
+
+export function normalizeEditorMetadata(value: EditorMetadata | undefined): EditorMetadata {
+  if (!value) return { blueprints: [], theme: "light" };
+  return {
+    blueprints: Array.isArray(value.blueprints) ? value.blueprints.map(normalizeEditorBlueprint) : [],
+    theme: value.theme === "dark" ? "dark" : "light",
+  };
+}
+
+export function normalizeEditorBlueprint(value: EditorBlueprint): EditorBlueprint {
+  const area = normalizeArea(value.area);
+  return {
+    key: value.key || area.id || "blueprint",
+    label: value.label || area.name || area.id || "Blueprint",
+    baseId: value.baseId || area.id || "area",
+    area,
   };
 }
 

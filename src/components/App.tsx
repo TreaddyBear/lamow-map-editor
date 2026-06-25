@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { createAreaFromBlueprint } from "../domain/blueprints";
+import { blueprintFromArea, createAreaFromBlueprint } from "../domain/blueprints";
 import { translateArea, translatePathShape, translateShape } from "../domain/geometry";
 import { exportJsonValue, importJsonText } from "../domain/importExport";
-import { clone, defaultPack, type Area, type CanvasTool, type DirtPath, type Fence, type HeightFeature, type LevelV1, type MapPackV1, type PathTool, type Point2, type Road, type Selection } from "../domain/model";
+import { clone, defaultPack, type Area, type CanvasTool, type DirtPath, type EditorBlueprint, type Fence, type HeightFeature, type LevelV1, type MapPackV1, type PathTool, type Point2, type Road, type Selection } from "../domain/model";
 import { normalizePack } from "../domain/normalization";
+import { samplePacks } from "../domain/samplePacks";
 import { validateLevel } from "../domain/validation";
 import type { EditorState, SidebarPanes } from "../editor/types";
 import { addAreaToLevel, collectUniqueId, currentLevel, getBounds, removeAreaAtPath, removeArrayItem, sameSelection, updateAreasAtPath, updateArray, updateCurrentLevel } from "../editor/utils";
@@ -14,6 +15,7 @@ import { ImportExportPane } from "./ImportExportPane";
 import { Inspector } from "./Inspector";
 import { Sidebar } from "./Sidebar";
 import { SnapControls } from "./SnapControls";
+import { SettingsDialog } from "./SettingsDialog";
 import { Viewport } from "./Viewport";
 import { ViewportToolbar } from "./ViewportToolbar";
 
@@ -38,6 +40,7 @@ export function App() {
   const [redoHistory, setRedoHistory] = useState<MapPackV1[]>([]);
   const [loadedPack, setLoadedPack] = useState<MapPackV1>(() => clone(defaultPack));
   const [blueprintsOpen, setBlueprintsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const level = currentLevel(state.pack, state.selectedLevelIndex);
   const validation = useMemo(() => validateLevel(state.pack, level), [state.pack, level]);
@@ -121,7 +124,7 @@ export function App() {
   const addBlueprint = (key: string, point: Point2) => {
     record((current) => {
       const level = currentLevel(current.pack, current.selectedLevelIndex);
-      const area = createAreaFromBlueprint(key, point, (base) => collectUniqueId(level, base));
+      const area = createAreaFromBlueprint(key, point, (base) => collectUniqueId(level, base), undefined, current.pack.editor?.blueprints ?? []);
       if (!area) return current;
       const result = addAreaToLevel(level, area, current.selection.kind === "area" ? current.selection.path : undefined);
       return { ...current, pack: updateCurrentLevel(current.pack, current.selectedLevelIndex, () => result.level), selection: { kind: "area", path: result.path }, contextMenu: null, jsonText: "" };
@@ -139,6 +142,19 @@ export function App() {
   };
 
   const currentLevelFromState = (editorState: EditorState) => currentLevel(editorState.pack, editorState.selectedLevelIndex);
+
+  const selectedArea = state.selection.kind === "area" && state.selection.path ? state.selection.path.reduce<Area | undefined>((current, index) => (current ? current.children?.[index] : level.areas[index]), undefined) : undefined;
+
+  const updateBlueprints = (updater: (blueprints: EditorBlueprint[]) => EditorBlueprint[]) => {
+    record((current) => {
+      const editor = current.pack.editor ?? { blueprints: [], theme: "light" as const };
+      return { ...current, pack: { ...current.pack, editor: { ...editor, blueprints: updater(editor.blueprints ?? []) } } };
+    });
+  };
+
+  const setTheme = (theme: "light" | "dark") => {
+    record((current) => ({ ...current, pack: { ...current.pack, editor: { ...(current.pack.editor ?? {}), theme } } }), false);
+  };
 
   const pathToolClick = (kind: PathTool, point: Point2) => {
     if (kind === "fence" && addFenceSegment(point)) return;
@@ -229,14 +245,23 @@ export function App() {
     record((current) => ({ ...current, pack: clone(loadedPack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: "Reverted to the last loaded map." }));
   };
 
+  const loadSample = (key: string) => {
+    const sample = samplePacks.find((item) => item.key === key);
+    if (!sample) return;
+    const pack = normalizePack(sample.create());
+    setLoadedPack(clone(pack));
+    record((current) => ({ ...current, pack, selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: `Loaded ${sample.label}.` }));
+  };
+
   return (
-    <main className={`app ${state.sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${state.importPanelOpen ? "import-is-open" : ""}`}>
+    <main className={`app theme-${state.pack.editor?.theme ?? "light"} ${state.sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${state.importPanelOpen ? "import-is-open" : ""}`}>
       <AppTopBar
         sidebarCollapsed={state.sidebarCollapsed}
         rightSidebarOpen={state.importPanelOpen}
         onToggleSidebar={() => setState((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }))}
         onToggleRightSidebar={() => setState((current) => ({ ...current, importPanelOpen: !current.importPanelOpen }))}
         onOpenBlueprints={() => setBlueprintsOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       <aside className={`panel sidebar-panel ${state.sidebarCollapsed ? "collapsed" : ""}`}>
         <Sidebar
@@ -251,7 +276,7 @@ export function App() {
         />
       </aside>
       <section className="panel canvas-panel">
-        <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} canUndo={history.length > 0} canRedo={redoHistory.length > 0} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} onUndo={undo} onRedo={redo} />
+        <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} canUndo={history.length > 0} canRedo={redoHistory.length > 0} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} onUndo={undo} onRedo={redo} />
         <div className="map-wrap">
           <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
           <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
@@ -263,11 +288,22 @@ export function App() {
           <div className="panel-header">
             <h2>Import / Export</h2>
           </div>
-          <ImportExportPane pack={state.pack} value={jsonValue} message={state.importMessage} onJsonText={(jsonText) => setState((current) => ({ ...current, jsonText }))} onCopy={() => navigator.clipboard.writeText(jsonValue).then(() => setState((current) => ({ ...current, importMessage: "Copied JSON to clipboard." })))} onDownload={downloadJson} onLoadJson={() => loadJsonText(jsonValue)} onOpenFile={(file) => file.text().then(loadJsonText).catch((error) => setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON file." })))} onRevert={revertLoadedPack} />
+          <ImportExportPane pack={state.pack} value={jsonValue} message={state.importMessage} samples={samplePacks} onJsonText={(jsonText) => setState((current) => ({ ...current, jsonText }))} onCopy={() => navigator.clipboard.writeText(jsonValue).then(() => setState((current) => ({ ...current, importMessage: "Copied JSON to clipboard." })))} onDownload={downloadJson} onLoadJson={() => loadJsonText(jsonValue)} onOpenFile={(file) => file.text().then(loadJsonText).catch((error) => setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON file." })))} onRevert={revertLoadedPack} onLoadSample={loadSample} />
         </aside>
       ) : null}
-      <BlueprintsDialog open={blueprintsOpen} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} onPinBlueprint={(key, pinned) => setState((current) => ({ ...current, pinnedAreaBlueprintKeys: pinned ? [...new Set([...current.pinnedAreaBlueprintKeys, key])] : current.pinnedAreaBlueprintKeys.filter((item) => item !== key) }))} onClose={() => setBlueprintsOpen(false)} />
-      <ContextMenu menu={state.contextMenu} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} onClose={() => setState((current) => ({ ...current, contextMenu: null }))} onSelect={(selection: Selection) => setState((current) => ({ ...current, selection, contextMenu: null }))} onDuplicate={duplicateSelection} onDelete={(selection) => deleteSelection(selection)} onMoveSpawn={() => state.contextMenu && updateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: state.contextMenu!.world } }))} onAddArea={() => state.contextMenu && addArea(state.contextMenu.world)} onAddChildArea={() => state.contextMenu && addArea(state.contextMenu.world, state.contextMenu.target?.kind === "area" ? state.contextMenu.target.path : state.selection.kind === "area" ? state.selection.path : undefined)} onAddBlueprint={(key) => state.contextMenu && addBlueprint(key, state.contextMenu.world)} onStartFence={() => state.contextMenu && pathToolClick("fence", state.contextMenu.world)} onAddRoad={() => state.contextMenu && addPathItem("road", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddDirtPath={() => state.contextMenu && addPathItem("dirtPath", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddHill={() => state.contextMenu && addHill(state.contextMenu.world)} />
+      <BlueprintsDialog
+        open={blueprintsOpen}
+        customBlueprints={state.pack.editor?.blueprints ?? []}
+        selectedArea={selectedArea}
+        pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys}
+        onPinBlueprint={(key, pinned) => setState((current) => ({ ...current, pinnedAreaBlueprintKeys: pinned ? [...new Set([...current.pinnedAreaBlueprintKeys, key])] : current.pinnedAreaBlueprintKeys.filter((item) => item !== key) }))}
+        onCreateFromSelection={() => selectedArea && updateBlueprints((items) => [...items, blueprintFromArea(selectedArea)])}
+        onUpdateBlueprint={(blueprint) => updateBlueprints((items) => items.map((item) => (item.key === blueprint.key ? blueprint : item)))}
+        onDeleteBlueprint={(key) => updateBlueprints((items) => items.filter((item) => item.key !== key))}
+        onClose={() => setBlueprintsOpen(false)}
+      />
+      <SettingsDialog open={settingsOpen} theme={state.pack.editor?.theme ?? "light"} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
+      <ContextMenu menu={state.contextMenu} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} onClose={() => setState((current) => ({ ...current, contextMenu: null }))} onSelect={(selection: Selection) => setState((current) => ({ ...current, selection, contextMenu: null }))} onDuplicate={duplicateSelection} onDelete={(selection) => deleteSelection(selection)} onMoveSpawn={() => state.contextMenu && updateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: state.contextMenu!.world } }))} onAddArea={() => state.contextMenu && addArea(state.contextMenu.world)} onAddChildArea={() => state.contextMenu && addArea(state.contextMenu.world, state.contextMenu.target?.kind === "area" ? state.contextMenu.target.path : state.selection.kind === "area" ? state.selection.path : undefined)} onAddBlueprint={(key) => state.contextMenu && addBlueprint(key, state.contextMenu.world)} onStartFence={() => state.contextMenu && pathToolClick("fence", state.contextMenu.world)} onAddRoad={() => state.contextMenu && addPathItem("road", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddDirtPath={() => state.contextMenu && addPathItem("dirtPath", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddHill={() => state.contextMenu && addHill(state.contextMenu.world)} />
     </main>
   );
 }

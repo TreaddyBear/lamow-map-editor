@@ -3,6 +3,7 @@ import {
   normalizeArea,
   normalizeAreaShape,
   normalizeDirtPath,
+  normalizeEditorMetadata,
   normalizeFence,
   normalizeHeightFeature,
   normalizeLevel,
@@ -87,6 +88,7 @@ function importV1Pack(value: Record<string, unknown> & { levels: unknown[] }): M
     units: "meters",
     coordinates: isRecord(value.coordinates) ? (value.coordinates as CoordinateMetadata) : defaultCoordinates,
     pack: { prefix: String(packInfo.prefix ?? "bgrn"), name: String(packInfo.name ?? "Beta Green") },
+    editor: normalizeEditorMetadata(value.editor as MapPackV1["editor"]),
     levels: value.levels.map(importV1Level),
   });
 }

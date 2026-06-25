@@ -721,9 +721,6 @@ label {
 }
 
 .snap-popover {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  left: 0;
   width: 13rem;
   display: grid;
   gap: 0.55rem;
@@ -732,6 +729,10 @@ label {
   background: rgb(248 251 246 / 97%);
   box-shadow: 0 12px 30px rgb(31 49 27 / 16%);
   padding: 0.65rem;
+}
+
+.popover-content {
+  z-index: 25;
 }
 
 .zoom-widget {
@@ -846,13 +847,15 @@ label {
   position: fixed;
   inset: 0;
   z-index: 30;
-  display: grid;
-  place-items: center;
   background: rgb(20 32 22 / 28%);
-  padding: 1rem;
 }
 
 .dialog-panel {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 31;
+  transform: translate(-50%, -50%);
   width: min(28rem, calc(100vw - 2rem));
   max-height: min(34rem, calc(100vh - 2rem));
   display: grid;
@@ -876,6 +879,52 @@ label {
 .dialog-header h2 {
   margin: 0;
   font-size: 1rem;
+}
+
+.dialog-header [data-radix-dialog-title] {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.theme-dark {
+  color: #dcebdd;
+  background: #111a12;
+}
+
+.theme-dark .panel,
+.theme-dark .app-topbar,
+.theme-dark .dialog-panel,
+.theme-dark .menu-content,
+.theme-dark .raw-json-pane,
+.theme-dark .item {
+  border-color: #375033;
+  background: #172318;
+}
+
+.theme-dark button,
+.theme-dark .file-button,
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea {
+  border-color: #48633f;
+  background: #101a11;
+  color: #e6f3e2;
+}
+
+.theme-dark button:hover {
+  background: #203320;
+}
+
+.theme-dark .sidebar-pane summary,
+.theme-dark .tree-row.active,
+.theme-dark .tree-row.active .tree-item,
+.theme-dark .ok {
+  background: #20371f;
+}
+
+.theme-dark .map-board {
+  background: #172318;
 }
 
 .status {

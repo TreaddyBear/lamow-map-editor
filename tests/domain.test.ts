@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createAreaFromBlueprint } from "../src/domain/blueprints";
+import { blueprintFromArea, createAreaFromBlueprint } from "../src/domain/blueprints";
 import { moveAreaShapeHandle, movePathShapeHandle } from "../src/domain/editHandles";
 import { exportJsonValue, importJsonText } from "../src/domain/importExport";
 import { rectFromCenter, shapeBounds, translateShape } from "../src/domain/geometry";
@@ -55,6 +55,20 @@ test("creates area blueprints with supplied ids and seeds", () => {
   assert.equal(area.shape.type, "rectangle");
   assert.deepEqual(area.shape.center, [3, 4]);
   assert.equal(area.vegetation.length, 2);
+});
+
+test("custom editor blueprints are saved and instantiate as areas", () => {
+  const pack = clone(defaultPack);
+  const source = pack.levels[0].areas[0];
+  const blueprint = blueprintFromArea(source, "Yard Archetype");
+  pack.editor = { blueprints: [blueprint], theme: "dark" };
+  const exported = exportJsonValue(pack);
+  assert.equal(exported.editor?.blueprints?.[0].label, "Yard Archetype");
+  assert.equal(exported.editor?.theme, "dark");
+
+  const area = createAreaFromBlueprint(blueprint.key, [10, 10], (base) => `${base}1`, () => 1, exported.editor?.blueprints);
+  assert.ok(area);
+  assert.equal(area?.kind, "area");
 });
 
 test("geometry helpers preserve shape type while translating", () => {

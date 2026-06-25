@@ -1,11 +1,12 @@
 import { Fence as FenceIcon, Mountain, MousePointer2, Plus, Redo2, Route, Square, Undo2, Waypoints } from "lucide-react";
-import { areaBlueprints } from "../domain/blueprints";
-import type { CanvasTool } from "../domain/model";
+import { allBlueprintOptions } from "../domain/blueprints";
+import type { CanvasTool, EditorBlueprint } from "../domain/model";
 import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator } from "./ui";
 
 type Props = {
   activeTool: CanvasTool;
   pinnedAreaBlueprintKeys: string[];
+  customBlueprints: EditorBlueprint[];
   canUndo: boolean;
   canRedo: boolean;
   onTool: (tool: CanvasTool) => void;
@@ -15,8 +16,8 @@ type Props = {
   onRedo: () => void;
 };
 
-export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, canUndo, canRedo, onTool, onAdd, onAddBlueprintAtOrigin, onUndo, onRedo }: Props) {
-  const pinned = pinnedAreaBlueprintKeys.map((key) => areaBlueprints.find((item) => item.key === key)).filter((item): item is (typeof areaBlueprints)[number] => Boolean(item));
+export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, customBlueprints, canUndo, canRedo, onTool, onAdd, onAddBlueprintAtOrigin, onUndo, onRedo }: Props) {
+  const pinned = pinnedAreaBlueprintKeys.map((key) => allBlueprintOptions(customBlueprints).find((item) => item.key === key)).filter((item): item is ReturnType<typeof allBlueprintOptions>[number] => Boolean(item));
   return (
     <div className="viewport-toolbar">
       <ActionRow className="toolbar-left">
