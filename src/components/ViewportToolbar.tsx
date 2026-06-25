@@ -18,29 +18,30 @@ type Props = {
 
 export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, customBlueprints, canUndo, canRedo, onTool, onAdd, onAddBlueprintAtOrigin, onUndo, onRedo }: Props) {
   const pinned = pinnedAreaBlueprintKeys.map((key) => allBlueprintOptions(customBlueprints).find((item) => item.key === key)).filter((item): item is ReturnType<typeof allBlueprintOptions>[number] => Boolean(item));
+  const itemIconClass = "grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:stroke-[2.2]";
   return (
-    <div className="viewport-toolbar">
-      <ActionRow className="toolbar-left">
-        <Button className="icon-button" tone={activeTool === "select" ? "primary" : "default"} type="button" title="Select" onClick={() => onTool("select")}><MousePointer2 /></Button>
-        <Menu trigger={<Button className="icon-button" type="button" title="Add"><Plus /></Button>}>
-          <MenuItem onSelect={() => onAdd("area")}><span className="menu-item-icon"><Square />Lawn area</span></MenuItem>
-          <MenuItem onSelect={() => onAdd("hill")}><span className="menu-item-icon"><Mountain />Hill</span></MenuItem>
-          <MenuItem onSelect={() => onAdd("road")}><span className="menu-item-icon"><Route />Road</span></MenuItem>
-          <MenuItem onSelect={() => onAdd("dirtPath")}><span className="menu-item-icon"><Waypoints />Dirt path</span></MenuItem>
-          <MenuItem onSelect={() => onAdd("fence")}><span className="menu-item-icon"><FenceIcon />Fence</span></MenuItem>
+    <div className="flex items-center justify-between gap-4 border-b border-[var(--surface-border)] px-3 py-2">
+      <ActionRow className="items-center">
+        <Button size="icon" tone={activeTool === "select" ? "primary" : "default"} type="button" title="Select" onClick={() => onTool("select")}><MousePointer2 /></Button>
+        <Menu trigger={<Button size="icon" type="button" title="Add"><Plus /></Button>}>
+          <MenuItem onSelect={() => onAdd("area")}><span className={itemIconClass}><Square />Lawn area</span></MenuItem>
+          <MenuItem onSelect={() => onAdd("hill")}><span className={itemIconClass}><Mountain />Hill</span></MenuItem>
+          <MenuItem onSelect={() => onAdd("road")}><span className={itemIconClass}><Route />Road</span></MenuItem>
+          <MenuItem onSelect={() => onAdd("dirtPath")}><span className={itemIconClass}><Waypoints />Dirt path</span></MenuItem>
+          <MenuItem onSelect={() => onAdd("fence")}><span className={itemIconClass}><FenceIcon />Fence</span></MenuItem>
           {pinned.length > 0 ? <MenuSeparator /> : null}
           {pinned.length > 0 ? <MenuLabel>Pinned blueprints</MenuLabel> : null}
           {pinned.map((blueprint) => <MenuItem key={blueprint.key} onSelect={() => onAddBlueprintAtOrigin(blueprint.key)}>{blueprint.label}</MenuItem>)}
         </Menu>
-        <Button className="icon-button" tone={activeTool === "area" ? "primary" : "default"} type="button" title="Add areas by clicking" onClick={() => onTool("area")}><Square /></Button>
-        <Button className="icon-button" tone={activeTool === "fence" ? "primary" : "default"} type="button" title="Draw fence" onClick={() => onTool("fence")}><FenceIcon /></Button>
-        <Button className="icon-button" tone={activeTool === "road" ? "primary" : "default"} type="button" title="Draw road" onClick={() => onTool("road")}><Route /></Button>
-        <Button className="icon-button" tone={activeTool === "dirtPath" ? "primary" : "default"} type="button" title="Draw dirt path" onClick={() => onTool("dirtPath")}><Waypoints /></Button>
-        <Button className="icon-button" tone={activeTool === "hill" ? "primary" : "default"} type="button" title="Add hills by clicking" onClick={() => onTool("hill")}><Mountain /></Button>
+        <Button size="icon" tone={activeTool === "area" ? "primary" : "default"} type="button" title="Add areas by clicking" onClick={() => onTool("area")}><Square /></Button>
+        <Button size="icon" tone={activeTool === "fence" ? "primary" : "default"} type="button" title="Draw fence" onClick={() => onTool("fence")}><FenceIcon /></Button>
+        <Button size="icon" tone={activeTool === "road" ? "primary" : "default"} type="button" title="Draw road" onClick={() => onTool("road")}><Route /></Button>
+        <Button size="icon" tone={activeTool === "dirtPath" ? "primary" : "default"} type="button" title="Draw dirt path" onClick={() => onTool("dirtPath")}><Waypoints /></Button>
+        <Button size="icon" tone={activeTool === "hill" ? "primary" : "default"} type="button" title="Add hills by clicking" onClick={() => onTool("hill")}><Mountain /></Button>
       </ActionRow>
-      <ActionRow className="toolbar-right">
-        <Button className="icon-button" type="button" disabled={!canUndo} title="Undo" onClick={onUndo}><Undo2 /></Button>
-        <Button className="icon-button" type="button" disabled={!canRedo} title="Redo" onClick={onRedo}><Redo2 /></Button>
+      <ActionRow className="items-center">
+        <Button size="icon" type="button" disabled={!canUndo} title="Undo" onClick={onUndo}><Undo2 /></Button>
+        <Button size="icon" type="button" disabled={!canRedo} title="Redo" onClick={onRedo}><Redo2 /></Button>
       </ActionRow>
     </div>
   );

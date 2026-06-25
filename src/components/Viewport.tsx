@@ -8,6 +8,7 @@ import { moveSelection, round, sameSelection, updateArray, updateAreasAtPath } f
 import { AreaSvg, HillSvg, PathSvg } from "./viewport/MapObjects";
 import { SelectionHandles } from "./viewport/SelectionHandles";
 import { applyLiveDrag, applySelectedGeometryPreview, clearLiveDrag } from "./viewport/sceneController";
+import { Button } from "./ui";
 
 type LiveDragState = {
   selection: Selection;
@@ -220,13 +221,13 @@ export function Viewport(props: Props) {
       </g>
       <SelectionHandles level={level} selection={props.selection} viewBox={viewBox} />
     </svg>
-    <div className="zoom-widget">
-      <button type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 0.82))}>+</button>
-      <button type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 1.18))}>-</button>
-      <button type="button" onClick={() => setViewBox(bounds)}>Fit</button>
+    <div className="absolute bottom-7 right-[calc(1.75rem+12rem+1.75rem)] z-10 flex gap-1.5 rounded-lg border border-[var(--surface-border)] bg-[color-mix(in_srgb,var(--surface-bg)_94%,transparent)] p-1.5 shadow-[0_8px_22px_rgb(31_49_27_/_12%)]">
+      <Button size="compact" type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 0.82))}>+</Button>
+      <Button size="compact" type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 1.18))}>-</Button>
+      <Button size="compact" type="button" onClick={() => setViewBox(bounds)}>Fit</Button>
     </div>
     <svg
-      className="minimap"
+      className="absolute bottom-7 right-7 z-10 h-32 w-48 cursor-pointer rounded-lg border border-[var(--input-border)] bg-[var(--surface-bg)] shadow-[0_8px_22px_rgb(31_49_27_/_12%)]"
       viewBox={`${bounds.xMin} ${bounds.zMin} ${Math.max(1, bounds.xMax - bounds.xMin)} ${Math.max(1, bounds.zMax - bounds.zMin)}`}
       preserveAspectRatio="xMidYMid meet"
       onPointerDown={(event) => {

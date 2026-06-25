@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { SnapSettings } from "../editor/types";
 import { Field, SelectField } from "./formControls";
-import { Popover } from "./ui";
+import { Popover, cn } from "./ui";
 
 type Props = {
   settings: SnapSettings;
@@ -18,17 +18,17 @@ export function SnapControls({ settings, onChange }: Props) {
   };
 
   return (
-    <div className={`snap-widget ${settings.enabled ? "active" : ""}`} onPointerEnter={() => settings.enabled && setOpen(true)}>
+    <div className="absolute left-7 top-7 z-10" onPointerEnter={() => settings.enabled && setOpen(true)}>
       <Popover
         open={settings.enabled && open}
         onOpenChange={setOpen}
         trigger={(
-          <button className="snap-toggle" type="button" title={settings.enabled ? "Disable snapping" : "Enable snapping"} aria-pressed={settings.enabled} onClick={toggleSnap}>
+          <button className={cn("grid h-10 w-10 place-items-center rounded-lg border border-[var(--input-border)] bg-[color-mix(in_srgb,var(--surface-bg)_94%,transparent)] p-0 text-xl font-black leading-none text-[var(--muted-text)] shadow-[0_8px_22px_rgb(31_49_27_/_12%)]", settings.enabled && "border-[#2f6f34] bg-[#2f6f34] text-white")} type="button" title={settings.enabled ? "Disable snapping" : "Enable snapping"} aria-pressed={settings.enabled} onClick={toggleSnap}>
             <span aria-hidden="true">U</span>
           </button>
         )}
       >
-        <div className="snap-popover">
+        <div className="grid w-52 gap-2 rounded-lg border border-[var(--surface-border)] bg-[color-mix(in_srgb,var(--surface-bg)_97%,transparent)] p-3 shadow-[0_12px_30px_rgb(31_49_27_/_16%)] [&_input]:py-1.5 [&_label]:text-[0.68rem] [&_select]:py-1.5">
           <SelectField
             label="mode"
             value={settings.mode}

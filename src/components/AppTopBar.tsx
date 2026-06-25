@@ -12,17 +12,17 @@ type Props = {
 
 export function AppTopBar({ sidebarCollapsed, rightSidebarOpen, onToggleSidebar, onToggleRightSidebar, onOpenBlueprints, onOpenSettings }: Props) {
   return (
-    <header className="app-topbar">
-      <ActionRow className="topbar-left">
-        <Menu trigger={<Button className="icon-button" type="button" title="App menu"><MenuIcon /></Button>}>
+    <header className="col-span-full flex min-w-0 items-center justify-between gap-4 rounded-lg border border-[var(--surface-border)] bg-[var(--surface-bg)] px-3 py-1.5">
+      <ActionRow className="items-center">
+        <Menu trigger={<Button size="icon" type="button" title="App menu"><MenuIcon /></Button>}>
           <MenuItem onSelect={onOpenBlueprints}>Blueprints</MenuItem>
           <MenuItem onSelect={onOpenSettings}>Settings</MenuItem>
         </Menu>
-        <Button className="icon-button" type="button" title={sidebarCollapsed ? "Show left sidebar" : "Hide left sidebar"} onClick={onToggleSidebar}>{sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</Button>
-        <strong>LaMow Map Editor</strong>
+        <Button size="icon" type="button" title={sidebarCollapsed ? "Show left sidebar" : "Hide left sidebar"} onClick={onToggleSidebar}>{sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</Button>
+        <strong className="text-[1.85rem] font-light leading-none">LaMow Map Editor</strong>
       </ActionRow>
-      <ActionRow className="topbar-actions">
-        <Button className="icon-button" type="button" title={rightSidebarOpen ? "Hide right sidebar" : "Show right sidebar"} tone={rightSidebarOpen ? "primary" : "default"} onClick={onToggleRightSidebar}>{rightSidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}</Button>
+      <ActionRow className="items-center">
+        <Button size="icon" type="button" title={rightSidebarOpen ? "Hide right sidebar" : "Show right sidebar"} tone={rightSidebarOpen ? "primary" : "default"} onClick={onToggleRightSidebar}>{rightSidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}</Button>
       </ActionRow>
     </header>
   );

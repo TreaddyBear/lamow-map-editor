@@ -7,19 +7,19 @@ export function ImportExportPane({ value, message, samples, onJsonText, onCopy, 
   return (
     <PanelBody className="min-h-0">
       <Stack>
-        <ActionRow className="io-actions">
-          <FileButton accept="application/json,.json,.txt,text/plain" onFile={onOpenFile}>Import</FileButton>
-          <Button tone="primary" type="button" onClick={onDownload}>Export</Button>
-          <Menu trigger={<Button type="button">Samples</Button>}>
+        <ActionRow className="items-center">
+          <FileButton className="min-h-0 px-2 py-1.5 text-[0.82rem] leading-tight" accept="application/json,.json,.txt,text/plain" onFile={onOpenFile}>Import</FileButton>
+          <Button size="compact" tone="primary" type="button" onClick={onDownload}>Export</Button>
+          <Menu trigger={<Button size="compact" type="button">Samples</Button>}>
             {samples.map((sample) => <MenuItem key={sample.key} onSelect={() => onLoadSample(sample.key)}>{sample.label}</MenuItem>)}
           </Menu>
-          <Button type="button" onClick={onCopy}>Copy JSON</Button>
-          <Button type="button" onClick={onRevert}>Revert</Button>
+          <Button size="compact" type="button" onClick={onCopy}>Copy JSON</Button>
+          <Button size="compact" type="button" onClick={onRevert}>Revert</Button>
         </ActionRow>
-        <details className="raw-json-pane">
-          <summary>Raw JSON</summary>
+        <details className="rounded-lg border border-[var(--surface-border)] bg-[var(--input-bg)]">
+          <summary className="cursor-pointer px-3 py-2 font-extrabold">Raw JSON</summary>
           <Stack className="px-3 pb-3">
-            <TextareaControl spellCheck={false} value={value} onChange={(event) => onJsonText(event.currentTarget.value)} />
+            <TextareaControl className="min-h-72 font-mono text-xs leading-[1.35]" spellCheck={false} value={value} onChange={(event) => onJsonText(event.currentTarget.value)} />
             <Button type="button" onClick={onLoadJson}>Load pasted JSON</Button>
           </Stack>
         </details>

@@ -281,16 +281,16 @@ export function App() {
           inspector={<Inspector level={level} selection={state.selection} onUpdateLevel={updateLevel} onUpdateArea={updateArea} onDeleteSelection={() => deleteSelection()} />}
         />
       </Panel>
-      <Panel className="canvas-panel">
+      <Panel className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
         <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} canUndo={history.length > 0} canRedo={redoHistory.length > 0} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} onUndo={undo} onRedo={redo} />
         <div className="map-wrap">
           <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
           <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
         </div>
-        <div className="status">{validation.length === 0 ? <StatusMessage>Draft v1 shape validates for the checks currently implemented.</StatusMessage> : validation.map((error) => <StatusMessage key={error} tone="error">{error}</StatusMessage>)}</div>
+        <div className="grid gap-2 border-t border-[var(--surface-border)] px-4 py-3">{validation.length === 0 ? <StatusMessage>Draft v1 shape validates for the checks currently implemented.</StatusMessage> : validation.map((error) => <StatusMessage key={error} tone="error">{error}</StatusMessage>)}</div>
       </Panel>
       {state.importPanelOpen ? (
-        <Panel as="aside" className="import-panel">
+        <Panel as="aside" className="grid grid-rows-[auto_minmax(0,1fr)] max-[1180px]:fixed max-[1180px]:right-4 max-[1180px]:top-4 max-[1180px]:z-10 max-[1180px]:w-[min(420px,calc(100vw-2rem))]">
           <PanelHeader>
             <h2>Import / Export</h2>
           </PanelHeader>

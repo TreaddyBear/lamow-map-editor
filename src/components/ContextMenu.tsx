@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { allBlueprintOptions } from "../domain/blueprints";
 import type { ContextMenuState, EditorBlueprint, Selection } from "../domain/model";
-import { Button } from "./ui";
+import { cn } from "./ui";
+import { menuContentClass, menuItemClass, menuLabelClass, menuSeparatorClass } from "./ui/Menu";
 
 export function ContextMenu({ menu, pinnedAreaBlueprintKeys, customBlueprints, onClose, onSelect, onDuplicate, onDelete, onMoveSpawn, onAddArea, onAddChildArea, onAddBlueprint, onStartFence, onAddRoad, onAddDirtPath, onAddHill }: {
   menu: ContextMenuState;
@@ -34,27 +35,35 @@ export function ContextMenu({ menu, pinnedAreaBlueprintKeys, customBlueprints, o
   const blueprints = allBlueprintOptions(customBlueprints);
   const pinned = pinnedAreaBlueprintKeys.map((key) => blueprints.find((item) => item.key === key)).filter((item): item is (typeof blueprints)[number] => Boolean(item));
   return (
-    <div ref={ref} id="context-menu" className="context-menu" style={{ left: menu.screenX, top: menu.screenY }}>
-      {menu.target ? <Button type="button" onClick={() => onSelect(menu.target!)}>Select target</Button> : null}
-      {menu.target ? <Button type="button" onClick={() => onDuplicate(menu.target!)}>Duplicate target</Button> : null}
-      {menu.target ? <Button tone="danger" type="button" onClick={() => onDelete(menu.target!)}>Delete target</Button> : null}
-      {menu.target ? <div className="context-divider" /> : null}
-      <Button type="button" onClick={onMoveSpawn}>Move spawn to crosshair</Button>
-      <div className="context-popout-row">
-        <Button type="button">Add</Button>
-        <div className="context-popout">
-        <Button type="button" onClick={onAddArea}>Lawn area here</Button>
-        <Button type="button" onClick={onAddChildArea}>Child area here</Button>
-        {pinned.length > 0 ? <div className="context-label">Pinned</div> : null}
-        {pinned.map((blueprint) => <Button key={`pinned-${blueprint.key}`} type="button" onClick={() => onAddBlueprint(blueprint.key)}>{blueprint.label}</Button>)}
-        {pinned.length > 0 ? <div className="context-label">All blueprints</div> : null}
-        {blueprints.map((blueprint) => <Button key={blueprint.key} type="button" onClick={() => onAddBlueprint(blueprint.key)}>{blueprint.label}</Button>)}
-        <Button type="button" onClick={onStartFence}>Start fence at crosshair</Button>
-        <Button type="button" onClick={onAddRoad}>Short road here</Button>
-        <Button type="button" onClick={onAddDirtPath}>Short dirt path here</Button>
-        <Button type="button" onClick={onAddHill}>Hill here</Button>
+    <div ref={ref} id="context-menu" className={cn(menuContentClass, "fixed")} style={{ left: menu.screenX, top: menu.screenY }}>
+      {menu.target ? <ContextMenuButton onClick={() => onSelect(menu.target!)}>Select target</ContextMenuButton> : null}
+      {menu.target ? <ContextMenuButton onClick={() => onDuplicate(menu.target!)}>Duplicate target</ContextMenuButton> : null}
+      {menu.target ? <ContextMenuButton tone="danger" onClick={() => onDelete(menu.target!)}>Delete target</ContextMenuButton> : null}
+      {menu.target ? <div className={menuSeparatorClass} /> : null}
+      <ContextMenuButton onClick={onMoveSpawn}>Move spawn to crosshair</ContextMenuButton>
+      <div className="group relative">
+        <ContextMenuButton className="w-full after:float-right after:content-['>']">Add</ContextMenuButton>
+        <div className={cn(menuContentClass, "absolute left-[calc(100%+0.35rem)] top-[-0.35rem] hidden max-h-[min(28rem,calc(100vh-2rem))] min-w-56 overflow-auto group-focus-within:grid group-hover:grid")}>
+          <ContextMenuButton onClick={onAddArea}>Lawn area here</ContextMenuButton>
+          <ContextMenuButton onClick={onAddChildArea}>Child area here</ContextMenuButton>
+          {pinned.length > 0 ? <div className={menuLabelClass}>Pinned</div> : null}
+          {pinned.map((blueprint) => <ContextMenuButton key={`pinned-${blueprint.key}`} onClick={() => onAddBlueprint(blueprint.key)}>{blueprint.label}</ContextMenuButton>)}
+          {pinned.length > 0 ? <div className={menuLabelClass}>All blueprints</div> : null}
+          {blueprints.map((blueprint) => <ContextMenuButton key={blueprint.key} onClick={() => onAddBlueprint(blueprint.key)}>{blueprint.label}</ContextMenuButton>)}
+          <ContextMenuButton onClick={onStartFence}>Start fence at crosshair</ContextMenuButton>
+          <ContextMenuButton onClick={onAddRoad}>Short road here</ContextMenuButton>
+          <ContextMenuButton onClick={onAddDirtPath}>Short dirt path here</ContextMenuButton>
+          <ContextMenuButton onClick={onAddHill}>Hill here</ContextMenuButton>
         </div>
       </div>
     </div>
+  );
+}
+
+function ContextMenuButton({ children, className = "", tone = "default", onClick }: { children: ReactNode; className?: string; tone?: "default" | "danger"; onClick?: () => void }) {
+  return (
+    <button className={cn(menuItemClass, "border-0 bg-transparent text-left hover:bg-[var(--subtle-bg)]", tone === "danger" && "text-[#9b2424]", className)} type="button" onClick={onClick}>
+      {children}
+    </button>
   );
 }
