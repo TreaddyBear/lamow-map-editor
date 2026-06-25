@@ -83,11 +83,11 @@ button.primary {
 input,
 select,
 textarea {
-  @apply w-full rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] px-2 py-2 text-[var(--app-text)];
+  color: var(--app-text);
 }
 
 textarea {
-  @apply min-h-56 resize-y;
+  resize: vertical;
 }
 
 .app {
@@ -107,10 +107,6 @@ textarea {
 
 .app.sidebar-is-collapsed.import-is-open {
   grid-template-columns: minmax(148px, 180px) minmax(0, 1fr) minmax(340px, 420px);
-}
-
-.panel {
-  @apply h-full max-h-full min-h-0 min-w-0 overflow-hidden rounded-lg border border-[var(--surface-border)] bg-[var(--surface-bg)];
 }
 
 .app-topbar {
@@ -136,47 +132,8 @@ textarea {
   stroke-width: 2.2;
 }
 
-.panel-header {
-  @apply flex items-center justify-between gap-4 border-b border-[var(--surface-border)] px-4 py-3;
-}
-
-.panel-header h1,
-.panel-header h2 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.panel-body {
-  @apply overflow-auto p-4;
-}
-
-.stack {
-  @apply grid gap-3;
-}
-
-.two {
-  @apply grid grid-cols-2 gap-2.5;
-}
-
 label {
-  @apply grid gap-1 text-xs font-bold text-[var(--muted-text)];
-}
-
-.section {
-  @apply border-t border-[var(--surface-border)] pt-3.5;
-}
-
-.section-title {
-  @apply mb-2.5 flex items-center justify-between gap-2;
-}
-
-.section-title h3 {
-  margin: 0;
-  font-size: 0.92rem;
-}
-
-.item {
-  @apply rounded-lg border border-[var(--surface-border)] bg-[var(--input-bg)] p-3;
+  color: var(--muted-text);
 }
 
 .sidebar-panel {
@@ -211,10 +168,6 @@ label {
   border-bottom: 1px solid var(--surface-border);
 }
 
-.sidebar-pane .panel-body {
-  padding: 0.7rem;
-}
-
 .sidebar-pane textarea {
   min-height: 10rem;
 }
@@ -244,17 +197,6 @@ label {
   color: var(--app-text);
   font-size: 0.74rem;
   font-weight: 800;
-}
-
-.checkbox-label {
-  display: flex;
-  grid-template-columns: none;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.checkbox-label input {
-  width: auto;
 }
 
 .inspector-pane textarea {
@@ -702,10 +644,6 @@ label {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.import-panel .panel-body {
-  min-height: 0;
-}
-
 .io-actions {
   align-items: center;
 }
@@ -728,10 +666,6 @@ label {
   cursor: pointer;
   font-weight: 800;
   padding: 0.55rem 0.7rem;
-}
-
-.raw-json-pane .stack {
-  padding: 0 0.7rem 0.7rem;
 }
 
 .raw-json-pane textarea {

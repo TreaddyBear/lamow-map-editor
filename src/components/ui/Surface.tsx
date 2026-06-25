@@ -33,6 +33,22 @@ export function Stack({ children, className = "", ...props }: HTMLAttributes<HTM
   );
 }
 
+export function Item({ children, className = "", ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
+  return (
+    <div {...props} className={cn("rounded-lg border border-[var(--surface-border)] bg-[var(--input-bg)] p-3", className)}>
+      {children}
+    </div>
+  );
+}
+
+export function SectionHeader({ children, className = "", ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
+  return (
+    <div {...props} className={cn("mb-2.5 flex items-center justify-between gap-2", className)}>
+      {children}
+    </div>
+  );
+}
+
 export function StatusMessage({ tone = "ok", children }: { tone?: "ok" | "error"; children: ReactNode }) {
   return <div className={cn("rounded-md px-3 py-2 text-sm", tone === "ok" ? "bg-[var(--ok-bg)] text-[var(--ok-text)]" : "bg-[var(--error-bg)] text-[var(--error-text)]")}>{children}</div>;
 }
