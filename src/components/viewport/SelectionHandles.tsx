@@ -7,5 +7,5 @@ export function SelectionHandles({ level, selection, viewBox }: { level: LevelV1
   useLayoutEffect(() => {
     if (ref.current) renderHandlesInto(ref.current, level, selection);
   }, [level, selection, viewBox]);
-  return <g ref={ref} className="edit-handles" />;
+  return <g ref={ref} className="edit-handles" pointerEvents="none" />;
 }

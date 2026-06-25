@@ -49,6 +49,14 @@ export function SectionHeader({ children, className = "", ...props }: HTMLAttrib
   );
 }
 
+export function Hint({ children, className = "", ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
+  return (
+    <div {...props} className={cn("text-[0.82rem] leading-snug text-[var(--muted-text)]", className)}>
+      {children}
+    </div>
+  );
+}
+
 export function StatusMessage({ tone = "ok", children }: { tone?: "ok" | "error"; children: ReactNode }) {
   return <div className={cn("rounded-md px-3 py-2 text-sm", tone === "ok" ? "bg-[var(--ok-bg)] text-[var(--ok-text)]" : "bg-[var(--error-bg)] text-[var(--error-text)]")}>{children}</div>;
 }

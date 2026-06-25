@@ -38,12 +38,12 @@ export function renderHandlesInto(handles: SVGGElement, level: LevelV1, selectio
   const scale = handleScale(svg);
   handles.replaceChildren(...selectionHandlePrimitives(level, selection).map((primitive) => {
     if (primitive.kind === "guide") {
-      return svgElement("line", { class: "edit-handle-guide", x1: primitive.start[0], y1: primitive.start[1], x2: primitive.end[0], y2: primitive.end[1] });
+      return svgElement("line", { x1: primitive.start[0], y1: primitive.start[1], x2: primitive.end[0], y2: primitive.end[1], stroke: "var(--map-selection)", "stroke-width": 0.05, "stroke-dasharray": "0.25 0.18", "pointer-events": "none", "vector-effect": "non-scaling-stroke" });
     }
-    const group = svgElement("g", { class: "edit-handle-node", "data-handle": primitive.handle, "data-handle-index": primitive.index });
+    const group = svgElement("g", { "data-handle": primitive.handle, "data-handle-index": primitive.index, cursor: "pointer", "pointer-events": "all" });
     group.append(
-      svgElement("circle", { class: "edit-handle-hit", cx: primitive.point[0], cy: primitive.point[1], r: (primitive.anchor ? 11 : 9) * scale }),
-      svgElement("circle", { class: `edit-handle ${primitive.anchor ? "anchor" : ""}`, cx: primitive.point[0], cy: primitive.point[1], r: (primitive.anchor ? 5.5 : 4.5) * scale }),
+      svgElement("circle", { cx: primitive.point[0], cy: primitive.point[1], r: (primitive.anchor ? 11 : 9) * scale, fill: "transparent", stroke: "transparent" }),
+      svgElement("circle", { cx: primitive.point[0], cy: primitive.point[1], r: (primitive.anchor ? 5.5 : 4.5) * scale, fill: primitive.anchor ? "color-mix(in srgb, var(--map-selection) 22%, var(--map-empty-fill))" : "var(--map-empty-fill)", stroke: "var(--map-selection)", "stroke-width": 0.08, "pointer-events": "none", "vector-effect": "non-scaling-stroke" }),
     );
     return group;
   }));

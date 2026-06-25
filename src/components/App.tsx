@@ -18,7 +18,7 @@ import { SnapControls } from "./SnapControls";
 import { SettingsDialog } from "./SettingsDialog";
 import { Viewport } from "./Viewport";
 import { ViewportToolbar } from "./ViewportToolbar";
-import { Panel, PanelHeader, StatusMessage } from "./ui";
+import { Panel, PanelHeader, StatusMessage, cn } from "./ui";
 
 export function App() {
   const [state, setState] = useState<EditorState>(() => ({
@@ -260,7 +260,12 @@ export function App() {
   };
 
   return (
-    <main className={`app theme-${theme} ${state.sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${state.importPanelOpen ? "import-is-open" : ""}`}>
+    <main className={cn(
+      `theme-${theme} grid h-screen max-h-screen gap-4 overflow-hidden p-4 [grid-template-rows:auto_minmax(0,1fr)] [grid-template-columns:minmax(360px,440px)_minmax(0,1fr)] max-[1180px]:[grid-template-columns:minmax(300px,360px)_minmax(0,1fr)]`,
+      state.importPanelOpen && "[grid-template-columns:minmax(320px,400px)_minmax(0,1fr)_minmax(340px,420px)] max-[1180px]:[grid-template-columns:minmax(300px,360px)_minmax(0,1fr)]",
+      state.sidebarCollapsed && "[grid-template-columns:minmax(148px,180px)_minmax(0,1fr)]",
+      state.sidebarCollapsed && state.importPanelOpen && "[grid-template-columns:minmax(148px,180px)_minmax(0,1fr)_minmax(340px,420px)] max-[1180px]:[grid-template-columns:minmax(300px,360px)_minmax(0,1fr)]",
+    )}>
       <AppTopBar
         sidebarCollapsed={state.sidebarCollapsed}
         rightSidebarOpen={state.importPanelOpen}
@@ -269,21 +274,23 @@ export function App() {
         onOpenBlueprints={() => setBlueprintsOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <Panel as="aside" className={`sidebar-panel ${state.sidebarCollapsed ? "collapsed" : ""}`}>
-        <Sidebar
-          level={level}
-          selection={state.selection}
-          panes={state.sidebarPanes}
-          onPaneToggle={(name: keyof SidebarPanes, open) => setState((current) => ({ ...current, sidebarPanes: { ...current.sidebarPanes, [name]: open }, sidebarCollapsed: false }))}
-          onSelect={(selection) => setState((current) => ({ ...current, selection }))}
-          onDelete={deleteSelection}
-          onAdd={addFromTree}
-          inspector={<Inspector level={level} selection={state.selection} onUpdateLevel={updateLevel} onUpdateArea={updateArea} onDeleteSelection={() => deleteSelection()} />}
-        />
+      <Panel as="aside" className="grid grid-rows-[minmax(0,1fr)]">
+        {state.sidebarCollapsed ? null : (
+          <Sidebar
+            level={level}
+            selection={state.selection}
+            panes={state.sidebarPanes}
+            onPaneToggle={(name: keyof SidebarPanes, open) => setState((current) => ({ ...current, sidebarPanes: { ...current.sidebarPanes, [name]: open }, sidebarCollapsed: false }))}
+            onSelect={(selection) => setState((current) => ({ ...current, selection }))}
+            onDelete={deleteSelection}
+            onAdd={addFromTree}
+            inspector={<Inspector level={level} selection={state.selection} onUpdateLevel={updateLevel} onUpdateArea={updateArea} onDeleteSelection={() => deleteSelection()} />}
+          />
+        )}
       </Panel>
       <Panel className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
         <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} canUndo={history.length > 0} canRedo={redoHistory.length > 0} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} onUndo={undo} onRedo={redo} />
-        <div className="map-wrap">
+        <div className="relative min-h-0 p-4">
           <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
           <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
         </div>

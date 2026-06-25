@@ -9,8 +9,8 @@ export function AreaSvg({ area, path, selection }: { area: Area; path: number[];
   const fill = area.role === "bed" || area.surface === "dirt" ? "var(--map-dirt-fill)" : area.composition === "additive" ? "var(--map-additive-fill)" : area.role === "background" ? "var(--map-background-fill)" : "var(--map-lawn-fill)";
   const stroke = selected ? "var(--map-selection)" : area.role === "bed" || area.surface === "dirt" ? "var(--map-dirt-stroke)" : area.composition === "additive" ? "var(--map-additive-stroke)" : "var(--map-lawn-stroke)";
   return (
-    <g {...select} className="map-object">
-      <ShapeSvg shape={area.shape} attrs={{ ...select, className: selected ? "selected-object" : "", fill, opacity: area.composition === "additive" ? 0.42 : area.role === "background" ? 0.24 : 0.68, stroke, strokeWidth: selected ? 0.08 : 0.06 }} />
+    <g {...select} className={mapObjectClass}>
+      <ShapeSvg shape={area.shape} attrs={{ ...select, className: selected ? selectedObjectClass : "", fill, opacity: area.composition === "additive" ? 0.42 : area.role === "background" ? 0.24 : 0.68, stroke, strokeWidth: selected ? 0.08 : 0.06 }} />
       {(area.children ?? []).map((child, index) => <AreaSvg key={`${child.id}-${index}`} area={child} path={[...path, index]} selection={selection} />)}
     </g>
   );
@@ -18,16 +18,19 @@ export function AreaSvg({ area, path, selection }: { area: Area; path: number[];
 
 export function HillSvg({ hill, index, selection }: { hill: HeightFeature; index: number; selection: Selection }) {
   const selected = sameSelection(selection, { kind: "heightFeature", index });
-  return <ShapeSvg shape={hill.shape} attrs={{ ...selectAttrs({ kind: "heightFeature", index }), className: `map-object ${selected ? "selected-object" : ""}`, fill: "var(--map-hill-fill)", opacity: 0.42, stroke: selected ? "var(--map-selection)" : "var(--map-hill-stroke)", strokeWidth: selected ? 0.08 : 0.06, strokeDasharray: "0.4 0.25" }} />;
+  return <ShapeSvg shape={hill.shape} attrs={{ ...selectAttrs({ kind: "heightFeature", index }), className: `${mapObjectClass} ${selected ? selectedObjectClass : ""}`, fill: "var(--map-hill-fill)", opacity: 0.42, stroke: selected ? "var(--map-selection)" : "var(--map-hill-stroke)", strokeWidth: selected ? 0.08 : 0.06, strokeDasharray: "0.4 0.25" }} />;
 }
 
 export function PathSvg({ shape, item, selection, color, width, className }: { shape: PathShape; item: Selection; selection: Selection; color: string; width: number; className: string }) {
   const selected = sameSelection(selection, item);
-  const attrs = { ...selectAttrs(item), className: `map-object ${className} ${selected ? "selected-object" : ""}`, fill: "none", stroke: selected ? "var(--map-selection)" : color, strokeWidth: selected ? Math.max(width, 0.08) : width, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const attrs = { ...selectAttrs(item), className: `${mapObjectClass} ${className} ${selected ? selectedObjectClass : ""}`, fill: "none", stroke: selected ? "var(--map-selection)" : color, strokeWidth: selected ? Math.max(width, 0.08) : width, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   if (shape.type === "line") return <line {...attrs} x1={shape.start[0]} y1={shape.start[1]} x2={shape.end[0]} y2={shape.end[1]} />;
   if (shape.type === "polyline") return <polyline {...attrs} points={shape.points.map((point) => `${point[0]},${point[1]}`).join(" ")} />;
   return <path {...attrs} d={`M ${shape.start[0]} ${shape.start[1]} ${shape.curves.map((curve) => `C ${curve.c1[0]} ${curve.c1[1]}, ${curve.c2[0]} ${curve.c2[1]}, ${curve.end[0]} ${curve.end[1]}`).join(" ")}`} />;
 }
+
+export const mapObjectClass = "cursor-grab active:cursor-grabbing";
+export const selectedObjectClass = "filter-[drop-shadow(0_0_0.08px_#2563eb)]";
 
 function ShapeSvg({ shape, attrs }: { shape: AreaShape; attrs: React.SVGProps<SVGElement> }) {
   if (shape.type === "circle") return <circle {...attrs as React.SVGProps<SVGCircleElement>} cx={shape.center[0]} cy={shape.center[1]} r={shape.radius} />;

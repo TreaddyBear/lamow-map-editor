@@ -3,7 +3,7 @@ import { normalizeDistribution, normalizePoint2 } from "../domain/normalization"
 import { shapeBounds, pathPoints } from "../domain/geometry";
 import { appendCurve, appendPoint, getAreaByPath, numberValue, parseDistributionOctaves, parsePoints, parseTags, pointsText, tagsText, updateArray } from "../editor/utils";
 import { Field, Point2Fields, Section, SelectField, TextAreaField } from "./formControls";
-import { ActionRow, Button } from "./ui";
+import { ActionRow, Button, Hint } from "./ui";
 
 type Props = {
   level: LevelV1;
@@ -84,7 +84,7 @@ export function Inspector({ level, selection, onUpdateLevel, onUpdateArea, onDel
   if (selection.kind === "objects") {
     return (
       <Section title="Objects" action={level.objects.length > 0 ? <Button tone="danger" type="button" onClick={() => onUpdateLevel((current) => ({ ...current, objects: [] }))}>Clear</Button> : undefined}>
-        <div className="hint">Reserved in draft v1. Keep this empty until the object schema is defined.</div>
+        <Hint>Reserved in draft v1. Keep this empty until the object schema is defined.</Hint>
       </Section>
     );
   }
@@ -92,7 +92,7 @@ export function Inspector({ level, selection, onUpdateLevel, onUpdateArea, onDel
 }
 
 function Empty() {
-  return <div className="section"><div className="hint">Select an object to edit its properties.</div></div>;
+  return <Hint className="border-t border-[var(--surface-border)] pt-3.5">Select an object to edit its properties.</Hint>;
 }
 
 function AuthoredFields({ item, onChange }: { item: AuthoredItem; onChange: (item: AuthoredItem) => void }) {

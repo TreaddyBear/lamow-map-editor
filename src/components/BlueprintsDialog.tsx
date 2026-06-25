@@ -1,7 +1,7 @@
 import type { Area, EditorBlueprint } from "../domain/model";
 import { areaBlueprints } from "../domain/blueprints";
 import { CheckboxField, FormLabel, TextareaControl, TextInput } from "./formControls";
-import { ActionRow, Button, Dialog, Item, PanelBody, SectionHeader, Stack } from "./ui";
+import { ActionRow, Button, Dialog, Hint, Item, PanelBody, SectionHeader, Stack } from "./ui";
 
 type Props = {
   open: boolean;
@@ -33,12 +33,12 @@ export function BlueprintsDialog({ open, customBlueprints, selectedArea, pinnedA
               <h3>Custom</h3>
               <Button type="button" disabled={!selectedArea} onClick={onCreateFromSelection}>New from selection</Button>
             </SectionHeader>
-            {customBlueprints.length === 0 ? <div className="hint">Select an area and create a blueprint from it.</div> : null}
+            {customBlueprints.length === 0 ? <Hint>Select an area and create a blueprint from it.</Hint> : null}
             {customBlueprints.map((blueprint) => (
               <BlueprintEditor key={blueprint.key} blueprint={blueprint} pinned={pinnedAreaBlueprintKeys.includes(blueprint.key)} onPin={(pinned) => onPinBlueprint(blueprint.key, pinned)} onChange={onUpdateBlueprint} onDelete={() => onDeleteBlueprint(blueprint.key)} />
             ))}
           </section>
-          <div className="hint">Format v2 note: these custom area archetypes are editor metadata today. A future save format should formalize parameterized archetypes that compile into base level components.</div>
+          <Hint>Format v2 note: these custom area archetypes are editor metadata today. A future save format should formalize parameterized archetypes that compile into base level components.</Hint>
         </Stack>
       </PanelBody>
     </Dialog>

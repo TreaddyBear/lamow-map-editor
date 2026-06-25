@@ -5,7 +5,7 @@ import type { CanvasTool, PendingPathState } from "../domain/model";
 import { closestSelectionPoint, snapMoveDelta, snapPoint } from "../domain/snapping";
 import type { SnapSettings } from "../editor/types";
 import { moveSelection, round, sameSelection, updateArray, updateAreasAtPath } from "../editor/utils";
-import { AreaSvg, HillSvg, PathSvg } from "./viewport/MapObjects";
+import { AreaSvg, HillSvg, PathSvg, mapObjectClass, selectedObjectClass } from "./viewport/MapObjects";
 import { SelectionHandles } from "./viewport/SelectionHandles";
 import { applyLiveDrag, applySelectedGeometryPreview, clearLiveDrag } from "./viewport/sceneController";
 import { Button } from "./ui";
@@ -88,7 +88,7 @@ export function Viewport(props: Props) {
     <>
     <svg
       id="map-svg"
-      className="map-board"
+      className="h-full min-h-0 w-full cursor-default rounded-lg border border-[var(--surface-border)] bg-[var(--map-bg)] active:cursor-grabbing"
       viewBox={`${viewBox.xMin} ${viewBox.zMin} ${width} ${height}`}
       preserveAspectRatio="xMidYMid meet"
       onPointerDown={(event) => {
@@ -215,7 +215,7 @@ export function Viewport(props: Props) {
       {level.dirtPaths.map((path, index) => <PathSvg key={path.id} shape={path.shape} item={{ kind: "dirtPath", index }} selection={props.selection} color="var(--map-path-stroke)" width={path.width} className="dirt" />)}
       {level.fences.map((fence, index) => <PathSvg key={fence.id} shape={fence.shape} item={{ kind: "fence", index }} selection={props.selection} color="var(--map-fence-stroke)" width={0.24} className="fence" />)}
       {props.pendingPath ? <circle cx={props.pendingPath.start[0]} cy={props.pendingPath.start[1]} r="0.3" fill="var(--map-selection)" stroke="var(--map-empty-fill)" strokeWidth="0.08" /> : null}
-      <g data-selection-key="spawn::" data-select-kind="spawn" className={`map-object ${sameSelection(props.selection, { kind: "spawn" }) ? "selected-object" : ""}`} transform={`translate(${level.spawn.position[0]} ${level.spawn.position[1]}) rotate(${level.spawn.headingDegrees})`}>
+      <g data-selection-key="spawn::" data-select-kind="spawn" className={`${mapObjectClass} ${sameSelection(props.selection, { kind: "spawn" }) ? selectedObjectClass : ""}`} transform={`translate(${level.spawn.position[0]} ${level.spawn.position[1]}) rotate(${level.spawn.headingDegrees})`}>
         <circle r="0.38" fill="var(--map-empty-fill)" stroke="var(--map-selection)" strokeWidth="0.1" />
         <path d="M -0.18 0.15 L 0 -0.22 L 0.18 0.15 Z" fill="var(--map-selection)" />
       </g>
@@ -236,9 +236,9 @@ export function Viewport(props: Props) {
         setViewBox((current) => centerRectOn(current, point));
       }}
     >
-      <rect x={bounds.xMin} y={bounds.zMin} width={Math.max(1, bounds.xMax - bounds.xMin)} height={Math.max(1, bounds.zMax - bounds.zMin)} className="minimap-bg" />
+      <rect x={bounds.xMin} y={bounds.zMin} width={Math.max(1, bounds.xMax - bounds.xMin)} height={Math.max(1, bounds.zMax - bounds.zMin)} fill="var(--map-minimap-bg)" />
       {level.areas.map((area, index) => <AreaSvg key={`${area.id}-${index}`} area={area} path={[index]} selection={{ kind: "level" }} />)}
-      <rect className="minimap-view" x={viewBox.xMin} y={viewBox.zMin} width={width} height={height} />
+      <rect fill="color-mix(in srgb, var(--map-selection) 12%, transparent)" stroke="var(--map-selection)" strokeWidth="0.35" vectorEffect="non-scaling-stroke" pointerEvents="none" x={viewBox.xMin} y={viewBox.zMin} width={width} height={height} />
     </svg>
     </>
   );
