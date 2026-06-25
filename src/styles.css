@@ -1,4 +1,8 @@
+@import "tailwindcss";
+
 :root {
+  @apply bg-[#edf4e9] text-[#142016] antialiased;
+
   color: #142016;
   background: #edf4e9;
   font-family:
@@ -11,9 +15,7 @@
 html,
 body,
 #app {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
+  @apply h-full w-full overflow-hidden;
 }
 
 * {
@@ -21,7 +23,7 @@ body,
 }
 
 body {
-  margin: 0;
+  @apply m-0;
 }
 
 button,
@@ -32,67 +34,40 @@ textarea {
 }
 
 button {
-  border: 1px solid #9eb397;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #162216;
-  cursor: pointer;
-  font-weight: 650;
-  padding: 0.55rem 0.75rem;
+  @apply cursor-pointer rounded-md border border-[#9eb397] bg-white px-3 py-2 font-semibold text-[#162216];
 }
 
 .file-button {
-  width: auto;
-  border: 1px solid #9eb397;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #162216;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 650;
-  padding: 0.55rem 0.75rem;
+  @apply w-auto cursor-pointer rounded-md border border-[#9eb397] bg-white px-3 py-2 text-base font-semibold text-[#162216];
 }
 
 button:hover {
-  background: #f2f8ef;
+  @apply bg-[#f2f8ef];
 }
 
 button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
+  @apply cursor-not-allowed opacity-[0.45];
 }
 
 button.primary {
-  background: #2f6f34;
-  border-color: #2f6f34;
-  color: #ffffff;
+  @apply border-[#2f6f34] bg-[#2f6f34] text-white;
 }
 
 input,
 select,
 textarea {
-  width: 100%;
-  border: 1px solid #b5c8ad;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #142016;
-  padding: 0.5rem 0.55rem;
+  @apply w-full rounded-md border border-[#b5c8ad] bg-white px-2 py-2 text-[#142016];
 }
 
 textarea {
-  min-height: 14rem;
-  resize: vertical;
+  @apply min-h-56 resize-y;
 }
 
 .app {
-  height: 100vh;
-  max-height: 100vh;
-  display: grid;
+  @apply grid h-screen max-h-screen gap-4 overflow-hidden p-4;
+
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
-  gap: 1rem;
-  padding: 1rem;
-  overflow: hidden;
 }
 
 .app.import-is-open {
@@ -108,33 +83,15 @@ textarea {
 }
 
 .panel {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  max-height: 100%;
-  border: 1px solid #c9d9c2;
-  border-radius: 8px;
-  background: #f8fbf6;
-  overflow: hidden;
+  @apply h-full max-h-full min-h-0 min-w-0 overflow-hidden rounded-lg border border-[#c9d9c2] bg-[#f8fbf6];
 }
 
 .app-topbar {
-  grid-column: 1 / -1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border: 1px solid #c9d9c2;
-  border-radius: 8px;
-  background: #f8fbf6;
-  padding: 0.35rem 0.7rem;
+  @apply col-span-full flex min-w-0 items-center justify-between gap-4 rounded-lg border border-[#c9d9c2] bg-[#f8fbf6] px-3 py-1.5;
 }
 
 .app-topbar strong {
-  font-size: 1.85rem;
-  font-weight: 300;
-  line-height: 1;
+  @apply text-[1.85rem] font-light leading-none;
 }
 
 .topbar-left,
@@ -143,27 +100,17 @@ textarea {
 }
 
 .icon-button {
-  display: inline-grid;
-  place-items: center;
-  min-width: 2.25rem;
-  width: 2.25rem;
-  height: 2.25rem;
-  padding-inline: 0.55rem;
+  @apply inline-grid h-9 w-9 min-w-9 place-items-center px-2;
 }
 
 .icon-button svg {
-  width: 1rem;
-  height: 1rem;
+  @apply h-4 w-4;
+
   stroke-width: 2.2;
 }
 
 .panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-bottom: 1px solid #d8e3d3;
-  padding: 0.85rem 1rem;
+  @apply flex items-center justify-between gap-4 border-b border-[#d8e3d3] px-4 py-3;
 }
 
 .panel-header h1,
@@ -173,40 +120,27 @@ textarea {
 }
 
 .panel-body {
-  padding: 1rem;
-  overflow: auto;
+  @apply overflow-auto p-4;
 }
 
 .stack {
-  display: grid;
-  gap: 0.8rem;
+  @apply grid gap-3;
 }
 
 .two {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
+  @apply grid grid-cols-2 gap-2.5;
 }
 
 label {
-  display: grid;
-  gap: 0.25rem;
-  color: #435540;
-  font-size: 0.76rem;
-  font-weight: 700;
+  @apply grid gap-1 text-xs font-bold text-[#435540];
 }
 
 .section {
-  border-top: 1px solid #dce7d7;
-  padding-top: 0.9rem;
+  @apply border-t border-[#dce7d7] pt-3.5;
 }
 
 .section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.65rem;
+  @apply mb-2.5 flex items-center justify-between gap-2;
 }
 
 .section-title h3 {
@@ -215,10 +149,7 @@ label {
 }
 
 .item {
-  border: 1px solid #d2dfcc;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 0.75rem;
+  @apply rounded-lg border border-[#d2dfcc] bg-white p-3;
 }
 
 .sidebar-panel {
