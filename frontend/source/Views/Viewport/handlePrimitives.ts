@@ -1,6 +1,6 @@
-import { rectFromCenter } from "../../domain/geometry";
-import type { AreaShape, LevelV1, PathShape, Point2, Selection } from "../../domain/model";
-import { getAreaByPath, round } from "../../editor/utils";
+import { rectFromCenter } from "../../utilities/domain/geometry";
+import type { AreaShape, LevelV1, PathShape, Point2, Selection } from "../../utilities/domain/model";
+import { getAreaByPath, round } from "../../utilities/editor/utils";
 
 export type HandlePrimitive =
   | { kind: "guide"; start: Point2; end: Point2 }

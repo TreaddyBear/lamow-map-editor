@@ -1,7 +1,7 @@
 import { Fence as FenceIcon, Mountain, MousePointer2, Plus, Redo2, Route, Square, Undo2, Waypoints } from "lucide-react";
-import { allBlueprintOptions } from "../domain/blueprints";
-import type { CanvasTool, EditorBlueprint } from "../domain/model";
-import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator } from "./ui";
+import { allBlueprintOptions } from "../utilities/domain/blueprints";
+import type { CanvasTool, EditorBlueprint } from "../utilities/domain/model";
+import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator } from "../Components/Base";
 
 type Props = {
   activeTool: CanvasTool;

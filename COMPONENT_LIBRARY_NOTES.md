@@ -6,7 +6,7 @@ Why:
 
 - Radix now backs dialogs, dropdown menus, popovers, and context-menu primitives.
 - Native controls still cover simple fields, file inputs, checkboxes, and `details` panes.
-- A thin wrapper layer in `src/components/ui/` gives us a stable API that can later be backed by shadcn/ui, Ariakit, React Aria, or another library without rewriting every feature surface.
+- A thin wrapper layer in `frontend/source/Components/Base/` gives us a stable API that can later be backed by shadcn/ui, Ariakit, React Aria, or another library without rewriting every feature surface.
 - Tailwind belongs mostly in base wrappers, small semantic UI components, or tightly scoped viewport/SVG rendering modules. Feature components should prefer named components over long utility strings when the pattern is reusable.
 
 Current local wrappers:
@@ -42,5 +42,5 @@ Likely candidates:
 Open cleanup direction:
 
 - Create more semantic base/editor components so feature files do not carry raw layout classes everywhere.
-- Rename or reorganize `src/components/ui/` if we want a stricter `components/Base/*` boundary.
-- Pull large feature surfaces such as `Sidebar`, `ViewportToolbar`, `SnapControls`, and parts of `App` into smaller named components before adding more UI features.
+- Keep most Tailwind quarantined in `Components/Base`, small semantic view subcomponents, or tightly scoped SVG rendering modules.
+- Pull large feature surfaces such as `Sidebar`, `ViewportToolbar`, `SnapControls`, and parts of `Pages/EditorPage` into smaller named components before adding more UI features.

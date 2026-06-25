@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
-import type { LevelV1, Rect, Selection } from "../../domain/model";
+import type { LevelV1, Rect, Selection } from "../../utilities/domain/model";
 import { renderHandlesInto } from "./sceneController";
 
 export function SelectionHandles({ level, selection, viewBox }: { level: LevelV1; selection: Selection; viewBox: Rect }) {

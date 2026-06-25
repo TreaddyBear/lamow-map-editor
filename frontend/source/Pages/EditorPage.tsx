@@ -1,26 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
-import { blueprintFromArea, createAreaFromBlueprint } from "../domain/blueprints";
-import { translateArea, translatePathShape, translateShape } from "../domain/geometry";
-import { exportJsonValue, importJsonText } from "../domain/importExport";
-import { clone, defaultPack, type Area, type CanvasTool, type DirtPath, type EditorBlueprint, type Fence, type HeightFeature, type LevelV1, type MapPackV1, type PathTool, type Point2, type Road, type Selection } from "../domain/model";
-import { normalizePack } from "../domain/normalization";
-import { samplePacks } from "../domain/samplePacks";
-import { validateLevel } from "../domain/validation";
-import type { EditorState, SidebarPanes } from "../editor/types";
-import { addAreaToLevel, collectUniqueId, currentLevel, getBounds, removeAreaAtPath, removeArrayItem, sameSelection, updateAreasAtPath, updateArray, updateCurrentLevel } from "../editor/utils";
-import { AppTopBar } from "./AppTopBar";
-import { BlueprintsDialog } from "./BlueprintsDialog";
-import { ContextMenu } from "./ContextMenu";
-import { ImportExportPane } from "./ImportExportPane";
-import { Inspector } from "./Inspector";
-import { Sidebar } from "./Sidebar";
-import { SnapControls } from "./SnapControls";
-import { SettingsDialog } from "./SettingsDialog";
-import { Viewport } from "./Viewport";
-import { ViewportToolbar } from "./ViewportToolbar";
-import { Panel, PanelHeader, StatusMessage, cn } from "./ui";
+import { blueprintFromArea, createAreaFromBlueprint } from "../utilities/domain/blueprints";
+import { translateArea, translatePathShape, translateShape } from "../utilities/domain/geometry";
+import { exportJsonValue, importJsonText } from "../utilities/domain/importExport";
+import { clone, defaultPack, type Area, type CanvasTool, type DirtPath, type EditorBlueprint, type Fence, type HeightFeature, type LevelV1, type MapPackV1, type PathTool, type Point2, type Road, type Selection } from "../utilities/domain/model";
+import { normalizePack } from "../utilities/domain/normalization";
+import { samplePacks } from "../utilities/domain/samplePacks";
+import { validateLevel } from "../utilities/domain/validation";
+import type { EditorState, SidebarPanes } from "../utilities/editor/types";
+import { addAreaToLevel, collectUniqueId, currentLevel, getBounds, removeAreaAtPath, removeArrayItem, sameSelection, updateAreasAtPath, updateArray, updateCurrentLevel } from "../utilities/editor/utils";
+import { AppTopBar } from "../Views/AppTopBar";
+import { BlueprintsDialog } from "../Views/BlueprintsDialog";
+import { ContextMenu } from "../Views/ContextMenu";
+import { ImportExportPane } from "../Views/ImportExportPane";
+import { Inspector } from "../Views/Inspector";
+import { Sidebar } from "../Views/Sidebar";
+import { SnapControls } from "../Views/SnapControls";
+import { SettingsDialog } from "../Views/SettingsDialog";
+import { Viewport } from "../Views/Viewport";
+import { ViewportToolbar } from "../Views/ViewportToolbar";
+import { Panel, PanelHeader, StatusMessage, cn } from "../Components/Base";
 
-export function App() {
+export function EditorPage() {
   const [state, setState] = useState<EditorState>(() => ({
     pack: clone(defaultPack),
     selectedLevelIndex: 0,

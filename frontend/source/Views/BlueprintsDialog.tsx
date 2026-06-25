@@ -1,7 +1,7 @@
-import type { Area, EditorBlueprint } from "../domain/model";
-import { areaBlueprints } from "../domain/blueprints";
-import { CheckboxField, FormLabel, TextareaControl, TextInput } from "./formControls";
-import { ActionRow, Button, Dialog, Hint, Item, PanelBody, SectionHeader, Stack } from "./ui";
+import type { Area, EditorBlueprint } from "../utilities/domain/model";
+import { areaBlueprints } from "../utilities/domain/blueprints";
+import { CheckboxField, FormLabel, TextareaControl, TextInput } from "../Components/Base/FormControls";
+import { ActionRow, Button, Dialog, Hint, Item, PanelBody, SectionHeader, Stack } from "../Components/Base";
 
 type Props = {
   open: boolean;

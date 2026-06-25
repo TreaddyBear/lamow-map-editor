@@ -1,6 +1,6 @@
-import { rectFromCenter } from "../../domain/geometry";
-import type { Area, AreaShape, HeightFeature, PathShape, Selection } from "../../domain/model";
-import { sameSelection } from "../../editor/utils";
+import { rectFromCenter } from "../../utilities/domain/geometry";
+import type { Area, AreaShape, HeightFeature, PathShape, Selection } from "../../utilities/domain/model";
+import { sameSelection } from "../../utilities/editor/utils";
 import { selectAttrs } from "./svgHelpers";
 
 export function AreaSvg({ area, path, selection }: { area: Area; path: number[]; selection: Selection }) {

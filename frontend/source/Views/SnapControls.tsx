@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { SnapSettings } from "../editor/types";
-import { Field, SelectField } from "./formControls";
-import { Popover, cn } from "./ui";
+import type { SnapSettings } from "../utilities/editor/types";
+import { Field, SelectField } from "../Components/Base/FormControls";
+import { Popover, cn } from "../Components/Base";
 
 type Props = {
   settings: SnapSettings;

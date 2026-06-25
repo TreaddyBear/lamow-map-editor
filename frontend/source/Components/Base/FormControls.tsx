@@ -1,7 +1,7 @@
 import type { InputHTMLAttributes, LabelHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
-import type { Point2 } from "../domain/model";
-import { SectionHeader, Stack } from "./ui";
-import { cn } from "./ui/cn";
+import type { Point2 } from "../../utilities/domain/model";
+import { SectionHeader, Stack } from "./Surface";
+import { cn } from "./cn";
 
 type FieldProps = {
   label: string;

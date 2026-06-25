@@ -1,9 +1,9 @@
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Area, LevelV1, Selection } from "../domain/model";
-import type { SidebarPanes } from "../editor/types";
-import { pointLabel, sameSelection } from "../editor/utils";
-import { cn } from "./ui";
+import type { Area, LevelV1, Selection } from "../utilities/domain/model";
+import type { SidebarPanes } from "../utilities/editor/types";
+import { pointLabel, sameSelection } from "../utilities/editor/utils";
+import { cn } from "../Components/Base";
 
 type Props = {
   level: LevelV1;

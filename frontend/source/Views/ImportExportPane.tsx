@@ -1,7 +1,7 @@
-import type { SamplePack } from "../domain/samplePacks";
-import type { MapPackV1 } from "../domain/model";
-import { TextareaControl } from "./formControls";
-import { ActionRow, Button, FileButton, Menu, MenuItem, PanelBody, Stack, StatusMessage } from "./ui";
+import type { SamplePack } from "../utilities/domain/samplePacks";
+import type { MapPackV1 } from "../utilities/domain/model";
+import { TextareaControl } from "../Components/Base/FormControls";
+import { ActionRow, Button, FileButton, Menu, MenuItem, PanelBody, Stack, StatusMessage } from "../Components/Base";
 
 export function ImportExportPane({ value, message, samples, onJsonText, onCopy, onDownload, onLoadJson, onOpenFile, onRevert, onLoadSample }: { value: string; message: string; pack: MapPackV1; samples: SamplePack[]; onJsonText: (value: string) => void; onCopy: () => void; onDownload: () => void; onLoadJson: () => void; onOpenFile: (file: File) => void; onRevert: () => void; onLoadSample: (key: string) => void }) {
   return (

@@ -1,5 +1,5 @@
 import { Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { ActionRow, Button, Menu, MenuItem } from "./ui";
+import { ActionRow, Button, Menu, MenuItem } from "../Components/Base";
 
 type Props = {
   sidebarCollapsed: boolean;

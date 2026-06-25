@@ -1,14 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { blueprintFromArea, createAreaFromBlueprint } from "../src/domain/blueprints";
-import { moveAreaShapeHandle, movePathShapeHandle } from "../src/domain/editHandles";
-import { exportJsonValue, importJsonText } from "../src/domain/importExport";
-import { rectFromCenter, shapeBounds, translateShape } from "../src/domain/geometry";
-import { clone, defaultPack, type AreaShape } from "../src/domain/model";
-import { normalizePack } from "../src/domain/normalization";
-import { snapMoveDelta, snapPoint } from "../src/domain/snapping";
-import { validateLevel } from "../src/domain/validation";
+import { blueprintFromArea, createAreaFromBlueprint } from "../frontend/source/utilities/domain/blueprints";
+import { moveAreaShapeHandle, movePathShapeHandle } from "../frontend/source/utilities/domain/editHandles";
+import { exportJsonValue, importJsonText } from "../frontend/source/utilities/domain/importExport";
+import { rectFromCenter, shapeBounds, translateShape } from "../frontend/source/utilities/domain/geometry";
+import { clone, defaultPack, type AreaShape } from "../frontend/source/utilities/domain/model";
+import { normalizePack } from "../frontend/source/utilities/domain/normalization";
+import { snapMoveDelta, snapPoint } from "../frontend/source/utilities/domain/snapping";
+import { validateLevel } from "../frontend/source/utilities/domain/validation";
 
 test("normalizes packs with a fallback level", () => {
   const normalized = normalizePack({ ...clone(defaultPack), levels: [] });

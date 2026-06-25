@@ -1,8 +1,8 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { allBlueprintOptions } from "../domain/blueprints";
-import type { ContextMenuState, EditorBlueprint, Selection } from "../domain/model";
-import { cn } from "./ui";
-import { menuContentClass, menuItemClass, menuLabelClass, menuSeparatorClass } from "./ui/Menu";
+import { allBlueprintOptions } from "../utilities/domain/blueprints";
+import type { ContextMenuState, EditorBlueprint, Selection } from "../utilities/domain/model";
+import { cn } from "../Components/Base";
+import { menuContentClass, menuItemClass, menuLabelClass, menuSeparatorClass } from "../Components/Base/Menu";
 
 export function ContextMenu({ menu, pinnedAreaBlueprintKeys, customBlueprints, onClose, onSelect, onDuplicate, onDelete, onMoveSpawn, onAddArea, onAddChildArea, onAddBlueprint, onStartFence, onAddRoad, onAddDirtPath, onAddHill }: {
   menu: ContextMenuState;

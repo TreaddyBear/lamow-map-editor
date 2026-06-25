@@ -1,14 +1,14 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
-import { moveAreaShapeHandle, movePathShapeHandle } from "../domain/editHandles";
-import type { LevelV1, Point2, Rect, Selection } from "../domain/model";
-import type { CanvasTool, PendingPathState } from "../domain/model";
-import { closestSelectionPoint, snapMoveDelta, snapPoint } from "../domain/snapping";
-import type { SnapSettings } from "../editor/types";
-import { moveSelection, round, sameSelection, updateArray, updateAreasAtPath } from "../editor/utils";
-import { AreaSvg, HillSvg, PathSvg, mapObjectClass, selectedObjectClass } from "./viewport/MapObjects";
-import { SelectionHandles } from "./viewport/SelectionHandles";
-import { applyLiveDrag, applySelectedGeometryPreview, clearLiveDrag } from "./viewport/sceneController";
-import { Button } from "./ui";
+import { moveAreaShapeHandle, movePathShapeHandle } from "../utilities/domain/editHandles";
+import type { LevelV1, Point2, Rect, Selection } from "../utilities/domain/model";
+import type { CanvasTool, PendingPathState } from "../utilities/domain/model";
+import { closestSelectionPoint, snapMoveDelta, snapPoint } from "../utilities/domain/snapping";
+import type { SnapSettings } from "../utilities/editor/types";
+import { moveSelection, round, sameSelection, updateArray, updateAreasAtPath } from "../utilities/editor/utils";
+import { AreaSvg, HillSvg, PathSvg, mapObjectClass, selectedObjectClass } from "./Viewport/MapObjects";
+import { SelectionHandles } from "./Viewport/SelectionHandles";
+import { applyLiveDrag, applySelectedGeometryPreview, clearLiveDrag } from "./Viewport/sceneController";
+import { Button } from "../Components/Base";
 
 type LiveDragState = {
   selection: Selection;

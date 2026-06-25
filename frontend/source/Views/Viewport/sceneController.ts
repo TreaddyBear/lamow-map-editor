@@ -1,6 +1,6 @@
-import { rectFromCenter } from "../../domain/geometry";
-import type { AreaShape, LevelV1, PathShape, Selection } from "../../domain/model";
-import { getAreaByPath } from "../../editor/utils";
+import { rectFromCenter } from "../../utilities/domain/geometry";
+import type { AreaShape, LevelV1, PathShape, Selection } from "../../utilities/domain/model";
+import { getAreaByPath } from "../../utilities/editor/utils";
 import { selectionHandlePrimitives } from "./handlePrimitives";
 import { selectionKey } from "./svgHelpers";
 

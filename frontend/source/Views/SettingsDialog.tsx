@@ -1,5 +1,5 @@
-import { SelectField } from "./formControls";
-import { Dialog, PanelBody, Stack } from "./ui";
+import { SelectField } from "../Components/Base/FormControls";
+import { Dialog, PanelBody, Stack } from "../Components/Base";
 
 type Props = {
   open: boolean;

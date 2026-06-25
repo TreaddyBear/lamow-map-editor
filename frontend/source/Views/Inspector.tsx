@@ -1,9 +1,9 @@
-import { defaultPerlinDistribution, foliageRegistry, type Area, type AreaShape, type AuthoredItem, type DirtPath, type Distribution, type Fence, type FoliageType, type HeightFeature, type LevelV1, type PathShape, type Road, type Selection } from "../domain/model";
-import { normalizeDistribution, normalizePoint2 } from "../domain/normalization";
-import { shapeBounds, pathPoints } from "../domain/geometry";
-import { appendCurve, appendPoint, getAreaByPath, numberValue, parseDistributionOctaves, parsePoints, parseTags, pointsText, tagsText, updateArray } from "../editor/utils";
-import { Field, Point2Fields, Section, SelectField, TextAreaField } from "./formControls";
-import { ActionRow, Button, Hint } from "./ui";
+import { defaultPerlinDistribution, foliageRegistry, type Area, type AreaShape, type AuthoredItem, type DirtPath, type Distribution, type Fence, type FoliageType, type HeightFeature, type LevelV1, type PathShape, type Road, type Selection } from "../utilities/domain/model";
+import { normalizeDistribution, normalizePoint2 } from "../utilities/domain/normalization";
+import { shapeBounds, pathPoints } from "../utilities/domain/geometry";
+import { appendCurve, appendPoint, getAreaByPath, numberValue, parseDistributionOctaves, parsePoints, parseTags, pointsText, tagsText, updateArray } from "../utilities/editor/utils";
+import { Field, Point2Fields, Section, SelectField, TextAreaField } from "../Components/Base/FormControls";
+import { ActionRow, Button, Hint } from "../Components/Base";
 
 type Props = {
   level: LevelV1;
