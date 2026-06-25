@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { Area, LevelV1, Selection } from "../utilities/domain/model";
 import type { SidebarPanes } from "../utilities/editor/types";
 import { pointLabel, sameSelection } from "../utilities/editor/utils";
-import { cn } from "../Components/Base";
+import { DisclosurePane, cn } from "../Components/Base";
 
 type Props = {
   level: LevelV1;
@@ -19,8 +19,7 @@ type Props = {
 export function Sidebar({ level, selection, panes, onPaneToggle, onSelect, onDelete, onAdd, inspector }: Props) {
   return (
     <div className="grid min-h-0 content-start overflow-auto">
-      <details className="border-b border-[var(--surface-border)] [&[open]>summary]:border-b [&[open]>summary]:border-[var(--surface-border)]" open={panes.tree} onToggle={(event) => onPaneToggle("tree", event.currentTarget.open)}>
-        <summary className="cursor-pointer bg-[var(--subtle-bg)] px-3.5 py-3 font-extrabold marker:text-[var(--muted-text)]">Map</summary>
+      <DisclosurePane title="Map" open={panes.tree} onOpenChange={(open) => onPaneToggle("tree", open)}>
         <div className="min-h-0 overflow-auto p-2.5">
           <div className="mb-2 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
             <label className="text-xs font-extrabold text-[var(--app-text)]">Level</label>
@@ -43,11 +42,10 @@ export function Sidebar({ level, selection, panes, onPaneToggle, onSelect, onDel
             <TreeButton item={{ kind: "objects" }} active={sameSelection(selection, { kind: "objects" })} icon="O" label={`objects (${level.objects.length})`} onSelect={onSelect} />
           </div>
         </div>
-      </details>
-      <details className="border-b border-[var(--surface-border)] [&[open]>summary]:border-b [&[open]>summary]:border-[var(--surface-border)]" open={panes.inspector} onToggle={(event) => onPaneToggle("inspector", event.currentTarget.open)}>
-        <summary className="cursor-pointer bg-[var(--subtle-bg)] px-3.5 py-3 font-extrabold marker:text-[var(--muted-text)]">Inspector</summary>
+      </DisclosurePane>
+      <DisclosurePane title="Inspector" open={panes.inspector} onOpenChange={(open) => onPaneToggle("inspector", open)}>
         <div className="min-h-0 overflow-auto p-2.5 [&_textarea]:min-h-24">{inspector}</div>
-      </details>
+      </DisclosurePane>
     </div>
   );
 }

@@ -18,7 +18,7 @@ import { SnapControls } from "../Views/SnapControls";
 import { SettingsDialog } from "../Views/SettingsDialog";
 import { Viewport } from "../Views/Viewport";
 import { ViewportToolbar } from "../Views/ViewportToolbar";
-import { Panel, PanelHeader, StatusMessage, cn } from "../Components/Base";
+import { AppShell, CanvasPanelLayout, FloatingAsideLayout, MapStage, Panel, PanelHeader, SidebarSlot, StatusMessage, StatusStrip } from "../Components/Base";
 
 export function EditorPage() {
   const [state, setState] = useState<EditorState>(() => ({
@@ -260,12 +260,7 @@ export function EditorPage() {
   };
 
   return (
-    <main className={cn(
-      `theme-${theme} grid h-screen max-h-screen gap-4 overflow-hidden p-4 [grid-template-rows:auto_minmax(0,1fr)] [grid-template-columns:minmax(360px,440px)_minmax(0,1fr)] max-[1180px]:[grid-template-columns:minmax(300px,360px)_minmax(0,1fr)]`,
-      state.importPanelOpen && "[grid-template-columns:minmax(320px,400px)_minmax(0,1fr)_minmax(340px,420px)] max-[1180px]:[grid-template-columns:minmax(300px,360px)_minmax(0,1fr)]",
-      state.sidebarCollapsed && "[grid-template-columns:minmax(148px,180px)_minmax(0,1fr)]",
-      state.sidebarCollapsed && state.importPanelOpen && "[grid-template-columns:minmax(148px,180px)_minmax(0,1fr)_minmax(340px,420px)] max-[1180px]:[grid-template-columns:minmax(300px,360px)_minmax(0,1fr)]",
-    )}>
+    <AppShell leftCollapsed={state.sidebarCollapsed} rightOpen={state.importPanelOpen}>
       <AppTopBar
         sidebarCollapsed={state.sidebarCollapsed}
         rightSidebarOpen={state.importPanelOpen}
@@ -274,34 +269,40 @@ export function EditorPage() {
         onOpenBlueprints={() => setBlueprintsOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <Panel as="aside" className="grid grid-rows-[minmax(0,1fr)]">
-        {state.sidebarCollapsed ? null : (
-          <Sidebar
-            level={level}
-            selection={state.selection}
-            panes={state.sidebarPanes}
-            onPaneToggle={(name: keyof SidebarPanes, open) => setState((current) => ({ ...current, sidebarPanes: { ...current.sidebarPanes, [name]: open }, sidebarCollapsed: false }))}
-            onSelect={(selection) => setState((current) => ({ ...current, selection }))}
-            onDelete={deleteSelection}
-            onAdd={addFromTree}
-            inspector={<Inspector level={level} selection={state.selection} onUpdateLevel={updateLevel} onUpdateArea={updateArea} onDeleteSelection={() => deleteSelection()} />}
-          />
-        )}
+      <Panel as="aside">
+        <SidebarSlot>
+          {state.sidebarCollapsed ? null : (
+            <Sidebar
+              level={level}
+              selection={state.selection}
+              panes={state.sidebarPanes}
+              onPaneToggle={(name: keyof SidebarPanes, open) => setState((current) => ({ ...current, sidebarPanes: { ...current.sidebarPanes, [name]: open }, sidebarCollapsed: false }))}
+              onSelect={(selection) => setState((current) => ({ ...current, selection }))}
+              onDelete={deleteSelection}
+              onAdd={addFromTree}
+              inspector={<Inspector level={level} selection={state.selection} onUpdateLevel={updateLevel} onUpdateArea={updateArea} onDeleteSelection={() => deleteSelection()} />}
+            />
+          )}
+        </SidebarSlot>
       </Panel>
-      <Panel className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
-        <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} canUndo={history.length > 0} canRedo={redoHistory.length > 0} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} onUndo={undo} onRedo={redo} />
-        <div className="relative min-h-0 p-4">
-          <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
-          <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
-        </div>
-        <div className="grid gap-2 border-t border-[var(--surface-border)] px-4 py-3">{validation.length === 0 ? <StatusMessage>Draft v1 shape validates for the checks currently implemented.</StatusMessage> : validation.map((error) => <StatusMessage key={error} tone="error">{error}</StatusMessage>)}</div>
+      <Panel>
+        <CanvasPanelLayout>
+          <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} canUndo={history.length > 0} canRedo={redoHistory.length > 0} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} onUndo={undo} onRedo={redo} />
+          <MapStage>
+            <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
+            <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
+          </MapStage>
+          <StatusStrip>{validation.length === 0 ? <StatusMessage>Draft v1 shape validates for the checks currently implemented.</StatusMessage> : validation.map((error) => <StatusMessage key={error} tone="error">{error}</StatusMessage>)}</StatusStrip>
+        </CanvasPanelLayout>
       </Panel>
       {state.importPanelOpen ? (
-        <Panel as="aside" className="grid grid-rows-[auto_minmax(0,1fr)] max-[1180px]:fixed max-[1180px]:right-4 max-[1180px]:top-4 max-[1180px]:z-10 max-[1180px]:w-[min(420px,calc(100vw-2rem))]">
-          <PanelHeader>
-            <h2>Import / Export</h2>
-          </PanelHeader>
-          <ImportExportPane pack={state.pack} value={jsonValue} message={state.importMessage} samples={samplePacks} onJsonText={(jsonText) => setState((current) => ({ ...current, jsonText }))} onCopy={() => navigator.clipboard.writeText(jsonValue).then(() => setState((current) => ({ ...current, importMessage: "Copied JSON to clipboard." })))} onDownload={downloadJson} onLoadJson={() => loadJsonText(jsonValue)} onOpenFile={(file) => file.text().then(loadJsonText).catch((error) => setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON file." })))} onRevert={revertLoadedPack} onLoadSample={loadSample} />
+        <Panel as="aside">
+          <FloatingAsideLayout>
+            <PanelHeader>
+              <h2>Import / Export</h2>
+            </PanelHeader>
+            <ImportExportPane pack={state.pack} value={jsonValue} message={state.importMessage} samples={samplePacks} onJsonText={(jsonText) => setState((current) => ({ ...current, jsonText }))} onCopy={() => navigator.clipboard.writeText(jsonValue).then(() => setState((current) => ({ ...current, importMessage: "Copied JSON to clipboard." })))} onDownload={downloadJson} onLoadJson={() => loadJsonText(jsonValue)} onOpenFile={(file) => file.text().then(loadJsonText).catch((error) => setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON file." })))} onRevert={revertLoadedPack} onLoadSample={loadSample} />
+          </FloatingAsideLayout>
         </Panel>
       ) : null}
       <BlueprintsDialog
@@ -317,7 +318,7 @@ export function EditorPage() {
       />
       <SettingsDialog open={settingsOpen} theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
       <ContextMenu menu={state.contextMenu} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} onClose={() => setState((current) => ({ ...current, contextMenu: null }))} onSelect={(selection: Selection) => setState((current) => ({ ...current, selection, contextMenu: null }))} onDuplicate={duplicateSelection} onDelete={(selection) => deleteSelection(selection)} onMoveSpawn={() => state.contextMenu && updateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: state.contextMenu!.world } }))} onAddArea={() => state.contextMenu && addArea(state.contextMenu.world)} onAddChildArea={() => state.contextMenu && addArea(state.contextMenu.world, state.contextMenu.target?.kind === "area" ? state.contextMenu.target.path : state.selection.kind === "area" ? state.selection.path : undefined)} onAddBlueprint={(key) => state.contextMenu && addBlueprint(key, state.contextMenu.world)} onStartFence={() => state.contextMenu && pathToolClick("fence", state.contextMenu.world)} onAddRoad={() => state.contextMenu && addPathItem("road", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddDirtPath={() => state.contextMenu && addPathItem("dirtPath", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddHill={() => state.contextMenu && addHill(state.contextMenu.world)} />
-    </main>
+    </AppShell>
   );
 }
 

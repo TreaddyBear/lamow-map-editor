@@ -8,7 +8,7 @@ import { moveSelection, round, sameSelection, updateArray, updateAreasAtPath } f
 import { AreaSvg, HillSvg, PathSvg, mapObjectClass, selectedObjectClass } from "./Viewport/MapObjects";
 import { SelectionHandles } from "./Viewport/SelectionHandles";
 import { applyLiveDrag, applySelectedGeometryPreview, clearLiveDrag } from "./Viewport/sceneController";
-import { Button } from "../Components/Base";
+import { Button, FloatingSurface, FloatingWidget, MinimapSurface } from "../Components/Base";
 
 type LiveDragState = {
   selection: Selection;
@@ -221,13 +221,14 @@ export function Viewport(props: Props) {
       </g>
       <SelectionHandles level={level} selection={props.selection} viewBox={viewBox} />
     </svg>
-    <div className="absolute bottom-7 right-[calc(1.75rem+12rem+1.75rem)] z-10 flex gap-1.5 rounded-lg border border-[var(--surface-border)] bg-[color-mix(in_srgb,var(--surface-bg)_94%,transparent)] p-1.5 shadow-[0_8px_22px_rgb(31_49_27_/_12%)]">
-      <Button size="compact" type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 0.82))}>+</Button>
-      <Button size="compact" type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 1.18))}>-</Button>
-      <Button size="compact" type="button" onClick={() => setViewBox(bounds)}>Fit</Button>
-    </div>
-    <svg
-      className="absolute bottom-7 right-7 z-10 h-32 w-48 cursor-pointer rounded-lg border border-[var(--input-border)] bg-[var(--surface-bg)] shadow-[0_8px_22px_rgb(31_49_27_/_12%)]"
+    <FloatingWidget placement="bottom-before-minimap">
+      <FloatingSurface className="flex gap-1.5 p-1.5">
+        <Button size="compact" type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 0.82))}>+</Button>
+        <Button size="compact" type="button" onClick={() => setViewBox((current) => zoomRectAt(current, rectCenter(current), 1.18))}>-</Button>
+        <Button size="compact" type="button" onClick={() => setViewBox(bounds)}>Fit</Button>
+      </FloatingSurface>
+    </FloatingWidget>
+    <MinimapSurface
       viewBox={`${bounds.xMin} ${bounds.zMin} ${Math.max(1, bounds.xMax - bounds.xMin)} ${Math.max(1, bounds.zMax - bounds.zMin)}`}
       preserveAspectRatio="xMidYMid meet"
       onPointerDown={(event) => {
@@ -239,7 +240,7 @@ export function Viewport(props: Props) {
       <rect x={bounds.xMin} y={bounds.zMin} width={Math.max(1, bounds.xMax - bounds.xMin)} height={Math.max(1, bounds.zMax - bounds.zMin)} fill="var(--map-minimap-bg)" />
       {level.areas.map((area, index) => <AreaSvg key={`${area.id}-${index}`} area={area} path={[index]} selection={{ kind: "level" }} />)}
       <rect fill="color-mix(in srgb, var(--map-selection) 12%, transparent)" stroke="var(--map-selection)" strokeWidth="0.35" vectorEffect="non-scaling-stroke" pointerEvents="none" x={viewBox.xMin} y={viewBox.zMin} width={width} height={height} />
-    </svg>
+    </MinimapSurface>
     </>
   );
 }

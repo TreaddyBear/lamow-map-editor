@@ -1,7 +1,7 @@
 import { Fence as FenceIcon, Mountain, MousePointer2, Plus, Redo2, Route, Square, Undo2, Waypoints } from "lucide-react";
 import { allBlueprintOptions } from "../utilities/domain/blueprints";
 import type { CanvasTool, EditorBlueprint } from "../utilities/domain/model";
-import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator } from "../Components/Base";
+import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator, Toolbar } from "../Components/Base";
 
 type Props = {
   activeTool: CanvasTool;
@@ -20,7 +20,7 @@ export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, customBlu
   const pinned = pinnedAreaBlueprintKeys.map((key) => allBlueprintOptions(customBlueprints).find((item) => item.key === key)).filter((item): item is ReturnType<typeof allBlueprintOptions>[number] => Boolean(item));
   const itemIconClass = "grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:stroke-[2.2]";
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[var(--surface-border)] px-3 py-2">
+    <Toolbar>
       <ActionRow className="items-center">
         <Button size="icon" tone={activeTool === "select" ? "primary" : "default"} type="button" title="Select" onClick={() => onTool("select")}><MousePointer2 /></Button>
         <Menu trigger={<Button size="icon" type="button" title="Add"><Plus /></Button>}>
@@ -43,6 +43,6 @@ export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, customBlu
         <Button size="icon" type="button" disabled={!canUndo} title="Undo" onClick={onUndo}><Undo2 /></Button>
         <Button size="icon" type="button" disabled={!canRedo} title="Redo" onClick={onRedo}><Redo2 /></Button>
       </ActionRow>
-    </div>
+    </Toolbar>
   );
 }

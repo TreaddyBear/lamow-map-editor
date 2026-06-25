@@ -3,7 +3,7 @@ import { cn } from "./cn";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   tone?: "default" | "primary" | "danger";
-  size?: "default" | "compact" | "icon";
+  size?: "default" | "compact" | "icon" | "floatingIcon";
 };
 
 const buttonBase = "cursor-pointer rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 font-semibold text-[var(--app-text)] hover:bg-[var(--subtle-bg)] disabled:cursor-not-allowed disabled:opacity-[0.45]";
@@ -11,6 +11,7 @@ const buttonSize = {
   default: "",
   compact: "min-h-0 px-2 py-1.5 text-[0.82rem] leading-tight",
   icon: "inline-grid h-9 w-9 min-w-9 place-items-center px-2 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:stroke-[2.2]",
+  floatingIcon: "grid h-10 w-10 place-items-center p-0 text-xl font-black leading-none shadow-[0_8px_22px_rgb(31_49_27_/_12%)]",
 } satisfies Record<NonNullable<ButtonProps["size"]>, string>;
 const buttonTone = {
   default: "",
@@ -26,9 +27,9 @@ export function ActionRow({ children, className = "" }: { children: ReactNode; c
   return <div className={cn("flex flex-wrap gap-2", className)}>{children}</div>;
 }
 
-export function FileButton({ children, accept, className = "", onFile }: { children: ReactNode; accept: string; className?: string; onFile: (file: File) => void }) {
+export function FileButton({ children, accept, className = "", size = "default", onFile }: { children: ReactNode; accept: string; className?: string; size?: "default" | "compact"; onFile: (file: File) => void }) {
   return (
-    <label className={cn(buttonBase, "inline-flex w-auto items-center text-base", className)}>
+    <label className={cn(buttonBase, buttonSize[size], "inline-flex w-auto items-center text-base", className)}>
       {children}
       <input type="file" accept={accept} hidden onChange={(event) => event.currentTarget.files?.[0] && onFile(event.currentTarget.files[0])} />
     </label>
