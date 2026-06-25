@@ -27,7 +27,7 @@ export function SnapControls({ settings, onChange }: Props) {
   };
 
   return (
-    <div ref={ref} className={`snap-widget ${settings.enabled ? "active" : ""}`}>
+    <div ref={ref} className={`snap-widget ${settings.enabled ? "active" : ""}`} onPointerEnter={() => settings.enabled && setOpen(true)}>
       <button className="snap-toggle" type="button" title={settings.enabled ? "Disable snapping" : "Enable snapping"} aria-pressed={settings.enabled} onClick={toggleSnap}>
         <span aria-hidden="true">U</span>
       </button>

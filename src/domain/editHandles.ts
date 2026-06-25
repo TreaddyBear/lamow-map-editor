@@ -47,6 +47,10 @@ export function movePathShapeHandle(shape: PathShape, handle: string, index: num
     if (index === undefined) return shape;
     const curveIndex = Math.floor(index / 3);
     const key = ["c1", "c2", "end"][index % 3] as "c1" | "c2" | "end";
+    if (key === "end") {
+      const curve = shape.curves[curveIndex];
+      return { ...shape, curves: updateArray(shape.curves, curveIndex, { ...curve, c1: translatePoint(curve.c1, dx, dz), c2: translatePoint(curve.c2, dx, dz), end: point }) };
+    }
     return { ...shape, curves: updateArray(shape.curves, curveIndex, { ...shape.curves[curveIndex], [key]: point }) };
   }
   return translatePathShape(shape, dx, dz);

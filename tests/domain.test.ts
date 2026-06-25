@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createAreaFromBlueprint } from "../src/domain/blueprints";
-import { moveAreaShapeHandle } from "../src/domain/editHandles";
+import { moveAreaShapeHandle, movePathShapeHandle } from "../src/domain/editHandles";
 import { exportJsonValue, importJsonText } from "../src/domain/importExport";
 import { rectFromCenter, shapeBounds, translateShape } from "../src/domain/geometry";
 import { clone, defaultPack, type AreaShape } from "../src/domain/model";
@@ -72,6 +72,14 @@ test("rectangle rotation handles update rotation degrees", () => {
 
   assert.equal(rotated.type, "rectangle");
   assert.equal(rotated.rotationDegrees, 90);
+});
+
+test("moving a Bezier end node carries its segment handles", () => {
+  const shape = { type: "cubicBezierPath" as const, start: [0, 0] as [number, number], curves: [{ c1: [1, 0] as [number, number], c2: [2, 0] as [number, number], end: [3, 0] as [number, number] }] };
+  const moved = movePathShapeHandle(shape, "bezier", 2, [4, 1], 1, 1);
+
+  assert.equal(moved.type, "cubicBezierPath");
+  assert.deepEqual(moved.curves[0], { c1: [2, 1], c2: [3, 1], end: [4, 1] });
 });
 
 test("import/export accepts draft v1 packs", () => {

@@ -33,6 +33,7 @@ export function App() {
     snap: { enabled: false, increment: 1, mode: "toGrid" },
   }));
   const [history, setHistory] = useState<MapPackV1[]>([]);
+  const [redoHistory, setRedoHistory] = useState<MapPackV1[]>([]);
 
   const level = currentLevel(state.pack, state.selectedLevelIndex);
   const validation = useMemo(() => validateLevel(state.pack, level), [state.pack, level]);
@@ -42,7 +43,10 @@ export function App() {
   const jsonValue = state.jsonText || exportValue;
 
   const record = (updater: (current: EditorState) => EditorState, historyEntry = true) => {
-    if (historyEntry) setHistory((items) => [...items, clone(state.pack)].slice(-100));
+    if (historyEntry) {
+      setHistory((items) => [...items, clone(state.pack)].slice(-100));
+      setRedoHistory([]);
+    }
     setState(updater(state));
   };
   const updateLevel = (updater: (level: LevelV1) => LevelV1, historyEntry = true) => record((current) => ({ ...current, pack: updateCurrentLevel(current.pack, current.selectedLevelIndex, updater), jsonText: "" }), historyEntry);
@@ -139,7 +143,8 @@ export function App() {
           <h1>LaMow Map Editor</h1>
           <ActionRow>
             <Button type="button" onClick={() => setState((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }))}>{state.sidebarCollapsed ? "Show" : "Hide"}</Button>
-            <Button type="button" disabled={history.length === 0} onClick={() => { const previous = history.at(-1); if (previous) { setHistory((items) => items.slice(0, -1)); setState((current) => ({ ...current, pack: previous, selection: { kind: "level" }, importMessage: "Undid last edit." })); } }}>Undo</Button>
+            <Button type="button" disabled={history.length === 0} onClick={() => { const previous = history.at(-1); if (previous) { setRedoHistory((items) => [...items, clone(state.pack)].slice(-100)); setHistory((items) => items.slice(0, -1)); setState((current) => ({ ...current, pack: previous, selection: { kind: "level" }, importMessage: "Undid last edit." })); } }}>Undo</Button>
+            <Button type="button" disabled={redoHistory.length === 0} onClick={() => { const next = redoHistory.at(-1); if (next) { setHistory((items) => [...items, clone(state.pack)].slice(-100)); setRedoHistory((items) => items.slice(0, -1)); setState((current) => ({ ...current, pack: next, selection: { kind: "level" }, importMessage: "Redid last edit." })); } }}>Redo</Button>
             <Button type="button" onClick={() => record((current) => ({ ...current, pack: clone(defaultPack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: "" }))}>Reset</Button>
           </ActionRow>
         </div>
@@ -166,7 +171,7 @@ export function App() {
         </div>
         <div className="map-wrap">
           <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
-          <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater) => updateLevel(updater, false)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
+          <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
         </div>
         <div className="status">{validation.length === 0 ? <div className="ok">Draft v1 shape validates for the checks currently implemented.</div> : validation.map((error) => <div key={error} className="error">{error}</div>)}</div>
       </section>

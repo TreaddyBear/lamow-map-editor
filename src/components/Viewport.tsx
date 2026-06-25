@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { moveAreaShapeHandle, movePathShapeHandle } from "../domain/editHandles";
 import type { LevelV1, Point2, Rect, Selection } from "../domain/model";
 import type { CanvasTool, PendingPathState } from "../domain/model";
@@ -44,7 +44,7 @@ type Props = {
   snap: SnapSettings;
   onSelect: (selection: Selection) => void;
   onClearSelection: () => void;
-  onUpdateLevel: (updater: (level: LevelV1) => LevelV1) => void;
+  onUpdateLevel: (updater: (level: LevelV1) => LevelV1, historyEntry?: boolean) => void;
   onContextMenu: (screenX: number, screenY: number, world: Point2, target?: Selection) => void;
   onAddArea: (point: Point2, parentPath?: number[]) => void;
   onAddHill: (point: Point2) => void;
@@ -61,8 +61,7 @@ export function Viewport(props: Props) {
   const [viewBox, setViewBox] = useState(bounds);
   const width = Math.max(1, viewBox.xMax - viewBox.xMin);
   const height = Math.max(1, viewBox.zMax - viewBox.zMin);
-
-  useEffect(() => setViewBox(bounds), [bounds]);
+  const gridStep = props.snap.enabled ? Math.max(0.1, Number(props.snap.increment) || 1) : autoGridStep(width);
 
   const eventToWorld = (svg: SVGSVGElement, event: ReactPointerEvent<SVGSVGElement> | ReactMouseEvent<SVGSVGElement> | ReactWheelEvent<SVGSVGElement>): Point2 | null => {
     const ctm = svg.getScreenCTM();
@@ -111,14 +110,16 @@ export function Viewport(props: Props) {
         }
         if (props.canvasTool === "spawn") {
           props.onSelect({ kind: "spawn" });
-          props.onUpdateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: snappedWorld } }));
+          props.onUpdateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: snappedWorld } }), true);
           return;
         }
         if (props.canvasTool === "area") return props.onAddArea(snappedWorld, props.selection.kind === "area" ? props.selection.path : undefined);
         if (props.canvasTool === "hill") return props.onAddHill(snappedWorld);
         if (props.canvasTool === "fence" || props.canvasTool === "road" || props.canvasTool === "dirtPath") return props.onPathToolClick(props.canvasTool, snappedWorld);
         const target = targetSelection(event.target);
-        if (target) {
+        const nearbyTarget = target ?? nearestTargetSelection(event.currentTarget, event.clientX, event.clientY);
+        if (nearbyTarget) {
+          const target = nearbyTarget;
           props.onSelect(target);
           liveDragRef.current = { selection: target, start: world, anchor: closestSelectionPoint(level, target, world), last: world, dx: 0, dz: 0, moved: false };
           props.onFreezeViewport();
@@ -166,10 +167,10 @@ export function Viewport(props: Props) {
         const drag = liveDragRef.current;
         if (drag?.moved) {
           clearLiveDrag(event.currentTarget, drag.selection);
-          props.onUpdateLevel((current) => moveSelection(current, drag.selection, drag.dx, drag.dz));
+          props.onUpdateLevel((current) => moveSelection(current, drag.selection, drag.dx, drag.dz), true);
         }
         const handleDrag = liveEditHandleDragRef.current;
-        if (handleDrag?.moved) props.onUpdateLevel(() => handleDrag.previewLevel);
+        if (handleDrag?.moved) props.onUpdateLevel(() => handleDrag.previewLevel, true);
         liveDragRef.current = null;
         liveEditHandleDragRef.current = null;
         props.onReleaseViewport();
@@ -202,11 +203,11 @@ export function Viewport(props: Props) {
       }}
     >
       <defs>
-        <pattern id="grid" width="1" height="1" patternUnits="userSpaceOnUse">
-          <path d="M 1 0 L 0 0 0 1" fill="none" stroke="#b8c8b2" strokeWidth="0.025" />
+        <pattern id="grid" width={gridStep} height={gridStep} patternUnits="userSpaceOnUse">
+          <path d={`M ${gridStep} 0 L 0 0 0 ${gridStep}`} fill="none" stroke="#b8c8b2" strokeWidth={Math.max(gridStep * 0.025, width / 1200)} />
         </pattern>
       </defs>
-      <rect x={bounds.xMin} y={bounds.zMin} width={width} height={height} fill="url(#grid)" />
+      <rect x={viewBox.xMin} y={viewBox.zMin} width={width} height={height} fill="url(#grid)" />
       {level.areas.map((area, index) => <AreaSvg key={`${area.id}-${index}`} area={area} path={[index]} selection={props.selection} />)}
       {level.terrain.heightFeatures.map((hill, index) => <HillSvg key={hill.id} hill={hill} index={index} selection={props.selection} />)}
       {level.roads.map((road, index) => <PathSvg key={road.id} shape={road.shape} item={{ kind: "road", index }} selection={props.selection} color="#6c7177" width={road.width} className="road" />)}
@@ -267,6 +268,54 @@ function zoomRectAt(rect: Rect, point: Point2, factor: number): Rect {
     zMin: point[1] - height * topRatio,
     zMax: point[1] + height * (1 - topRatio),
   };
+}
+
+function autoGridStep(viewWidth: number): number {
+  const raw = viewWidth / 24;
+  const power = 10 ** Math.floor(Math.log10(Math.max(0.001, raw)));
+  const normalized = raw / power;
+  const multiplier = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return multiplier * power;
+}
+
+function nearestTargetSelection(svg: SVGSVGElement, clientX: number, clientY: number): Selection | null {
+  const candidates = Array.from(svg.querySelectorAll<SVGGraphicsElement>("[data-select-kind]")).map((element) => {
+    const selection = targetSelectionFromElement(element);
+    if (!selection) return null;
+    const distance = screenDistanceToElement(element, clientX, clientY);
+    return Number.isFinite(distance) ? { selection, distance } : null;
+  }).filter((item): item is { selection: Selection; distance: number } => Boolean(item));
+  const closest = candidates.sort((a, b) => a.distance - b.distance)[0];
+  return closest && closest.distance <= 14 ? closest.selection : null;
+}
+
+function targetSelectionFromElement(element: Element): Selection | null {
+  const kind = element.getAttribute("data-select-kind") as Selection["kind"] | null;
+  if (!kind) return null;
+  const path = element.getAttribute("data-select-path")?.split(".").map(Number).filter(Number.isInteger);
+  const indexText = element.getAttribute("data-select-index");
+  return { kind, path, index: indexText === null ? undefined : Number(indexText) };
+}
+
+function screenDistanceToElement(element: SVGGraphicsElement, clientX: number, clientY: number): number {
+  try {
+    const box = element.getBBox();
+    const ctm = element.getScreenCTM();
+    if (!ctm) return Number.POSITIVE_INFINITY;
+    const points = [
+      new DOMPoint(box.x, box.y).matrixTransform(ctm),
+      new DOMPoint(box.x + box.width, box.y).matrixTransform(ctm),
+      new DOMPoint(box.x + box.width, box.y + box.height).matrixTransform(ctm),
+      new DOMPoint(box.x, box.y + box.height).matrixTransform(ctm),
+    ];
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const dx = Math.max(Math.min(...xs) - clientX, 0, clientX - Math.max(...xs));
+    const dy = Math.max(Math.min(...ys) - clientY, 0, clientY - Math.max(...ys));
+    return Math.hypot(dx, dy);
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
 }
 
 function snapHandleTarget(world: Point2, start: Point2, snap: SnapSettings): Point2 {

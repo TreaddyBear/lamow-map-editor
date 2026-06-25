@@ -159,7 +159,11 @@ function convertPathShape(shape: PathShape, type: PathShape["type"]): PathShape 
   const start = points[0] ?? [0, 0];
   const end = points.at(-1) ?? [2, 0];
   if (type === "polyline") return { type: "polyline", points: points.length >= 2 ? points : [start, end] };
-  if (type === "cubicBezierPath") return { type: "cubicBezierPath", start, curves: [{ c1: start, c2: end, end }] };
+  if (type === "cubicBezierPath") {
+    const c1 = [Number((start[0] + (end[0] - start[0]) / 3).toFixed(3)), Number((start[1] + (end[1] - start[1]) / 3).toFixed(3))] as [number, number];
+    const c2 = [Number((start[0] + ((end[0] - start[0]) * 2) / 3).toFixed(3)), Number((start[1] + ((end[1] - start[1]) * 2) / 3).toFixed(3))] as [number, number];
+    return { type: "cubicBezierPath", start, curves: [{ c1, c2, end }] };
+  }
   return { type: "line", start, end };
 }
 
