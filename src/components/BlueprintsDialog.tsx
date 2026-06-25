@@ -1,7 +1,7 @@
 import type { Area, EditorBlueprint } from "../domain/model";
 import { areaBlueprints } from "../domain/blueprints";
 import { CheckboxField } from "./formControls";
-import { ActionRow, Button, Dialog } from "./ui";
+import { ActionRow, Button, Dialog, PanelBody, Stack } from "./ui";
 
 type Props = {
   open: boolean;
@@ -18,8 +18,9 @@ type Props = {
 export function BlueprintsDialog({ open, customBlueprints, selectedArea, pinnedAreaBlueprintKeys, onPinBlueprint, onCreateFromSelection, onUpdateBlueprint, onDeleteBlueprint, onClose }: Props) {
   return (
     <Dialog open={open} title="Blueprints" onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <div className="panel-body stack">
-        <section className="stack">
+      <PanelBody>
+        <Stack>
+        <section className="grid gap-3">
           <div className="section-title">
             <h3>Built-ins</h3>
           </div>
@@ -27,7 +28,7 @@ export function BlueprintsDialog({ open, customBlueprints, selectedArea, pinnedA
             <CheckboxField key={blueprint.key} label={`Pin ${blueprint.label.replace(" here", "")}`} checked={pinnedAreaBlueprintKeys.includes(blueprint.key)} onChange={(checked) => onPinBlueprint(blueprint.key, checked)} />
           ))}
         </section>
-        <section className="stack">
+        <section className="grid gap-3">
           <div className="section-title">
             <h3>Custom</h3>
             <Button type="button" disabled={!selectedArea} onClick={onCreateFromSelection}>New from selection</Button>
@@ -38,14 +39,15 @@ export function BlueprintsDialog({ open, customBlueprints, selectedArea, pinnedA
           ))}
         </section>
         <div className="hint">Format v2 note: these custom area archetypes are editor metadata today. A future save format should formalize parameterized archetypes that compile into base level components.</div>
-      </div>
+        </Stack>
+      </PanelBody>
     </Dialog>
   );
 }
 
 function BlueprintEditor({ blueprint, pinned, onPin, onChange, onDelete }: { blueprint: EditorBlueprint; pinned: boolean; onPin: (pinned: boolean) => void; onChange: (blueprint: EditorBlueprint) => void; onDelete: () => void }) {
   return (
-    <div className="item stack">
+    <Stack className="item">
       <ActionRow className="section-title">
         <strong>{blueprint.label}</strong>
         <Button tone="danger" type="button" onClick={onDelete}>Delete</Button>
@@ -63,7 +65,7 @@ function BlueprintEditor({ blueprint, pinned, onPin, onChange, onDelete }: { blu
         Area JSON
         <textarea spellCheck={false} value={JSON.stringify(blueprint.area, null, 2)} onChange={(event) => onChange(parseAreaBlueprint(blueprint, event.currentTarget.value))} />
       </label>
-    </div>
+    </Stack>
   );
 }
 

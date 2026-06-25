@@ -204,19 +204,19 @@ export function Viewport(props: Props) {
     >
       <defs>
         <pattern id="grid" width={gridStep} height={gridStep} patternUnits="userSpaceOnUse">
-          <path d={`M ${gridStep} 0 L 0 0 0 ${gridStep}`} fill="none" stroke="#b8c8b2" strokeWidth={Math.max(gridStep * 0.025, width / 1200)} />
+          <path d={`M ${gridStep} 0 L 0 0 0 ${gridStep}`} fill="none" stroke="var(--map-grid)" strokeWidth={Math.max(gridStep * 0.025, width / 1200)} />
         </pattern>
       </defs>
       <rect x={viewBox.xMin} y={viewBox.zMin} width={width} height={height} fill="url(#grid)" />
       {level.areas.map((area, index) => <AreaSvg key={`${area.id}-${index}`} area={area} path={[index]} selection={props.selection} />)}
       {level.terrain.heightFeatures.map((hill, index) => <HillSvg key={hill.id} hill={hill} index={index} selection={props.selection} />)}
-      {level.roads.map((road, index) => <PathSvg key={road.id} shape={road.shape} item={{ kind: "road", index }} selection={props.selection} color="#6c7177" width={road.width} className="road" />)}
-      {level.dirtPaths.map((path, index) => <PathSvg key={path.id} shape={path.shape} item={{ kind: "dirtPath", index }} selection={props.selection} color="#9a6a43" width={path.width} className="dirt" />)}
-      {level.fences.map((fence, index) => <PathSvg key={fence.id} shape={fence.shape} item={{ kind: "fence", index }} selection={props.selection} color="#6f482e" width={0.24} className="fence" />)}
-      {props.pendingPath ? <circle cx={props.pendingPath.start[0]} cy={props.pendingPath.start[1]} r="0.3" fill="#1d4ed8" stroke="#ffffff" strokeWidth="0.08" /> : null}
+      {level.roads.map((road, index) => <PathSvg key={road.id} shape={road.shape} item={{ kind: "road", index }} selection={props.selection} color="var(--map-road-stroke)" width={road.width} className="road" />)}
+      {level.dirtPaths.map((path, index) => <PathSvg key={path.id} shape={path.shape} item={{ kind: "dirtPath", index }} selection={props.selection} color="var(--map-path-stroke)" width={path.width} className="dirt" />)}
+      {level.fences.map((fence, index) => <PathSvg key={fence.id} shape={fence.shape} item={{ kind: "fence", index }} selection={props.selection} color="var(--map-fence-stroke)" width={0.24} className="fence" />)}
+      {props.pendingPath ? <circle cx={props.pendingPath.start[0]} cy={props.pendingPath.start[1]} r="0.3" fill="var(--map-selection)" stroke="var(--map-empty-fill)" strokeWidth="0.08" /> : null}
       <g data-selection-key="spawn::" data-select-kind="spawn" className={`map-object ${sameSelection(props.selection, { kind: "spawn" }) ? "selected-object" : ""}`} transform={`translate(${level.spawn.position[0]} ${level.spawn.position[1]}) rotate(${level.spawn.headingDegrees})`}>
-        <circle r="0.38" fill="#ffffff" stroke="#1d4ed8" strokeWidth="0.1" />
-        <path d="M -0.18 0.15 L 0 -0.22 L 0.18 0.15 Z" fill="#1d4ed8" />
+        <circle r="0.38" fill="var(--map-empty-fill)" stroke="var(--map-selection)" strokeWidth="0.1" />
+        <path d="M -0.18 0.15 L 0 -0.22 L 0.18 0.15 Z" fill="var(--map-selection)" />
       </g>
       <SelectionHandles level={level} selection={props.selection} viewBox={viewBox} />
     </svg>

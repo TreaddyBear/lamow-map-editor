@@ -5,7 +5,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   tone?: "default" | "primary" | "danger";
 };
 
-const buttonBase = "cursor-pointer rounded-md border border-[#9eb397] bg-white px-3 py-2 font-semibold text-[#162216] hover:bg-[#f2f8ef] disabled:cursor-not-allowed disabled:opacity-[0.45] [.theme-dark_&]:border-[#48633f] [.theme-dark_&]:bg-[#101a11] [.theme-dark_&]:text-[#e6f3e2] [.theme-dark_&]:hover:bg-[#203320]";
+const buttonBase = "cursor-pointer rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 font-semibold text-[var(--app-text)] hover:bg-[var(--subtle-bg)] disabled:cursor-not-allowed disabled:opacity-[0.45]";
 const buttonTone = {
   default: "",
   primary: "border-[#2f6f34] bg-[#2f6f34] text-white hover:bg-[#2f6f34]",

@@ -6,8 +6,8 @@ import { selectAttrs } from "./svgHelpers";
 export function AreaSvg({ area, path, selection }: { area: Area; path: number[]; selection: Selection }) {
   const selected = sameSelection(selection, { kind: "area", path });
   const select = selectAttrs({ kind: "area", path });
-  const fill = area.role === "bed" || area.surface === "dirt" ? "#8a5d3b" : area.composition === "additive" ? "#e4c94a" : area.role === "background" ? "#9dc58d" : "#69a957";
-  const stroke = selected ? "#2563eb" : area.role === "bed" || area.surface === "dirt" ? "#55351f" : area.composition === "additive" ? "#b18f1d" : "#315f2b";
+  const fill = area.role === "bed" || area.surface === "dirt" ? "var(--map-dirt-fill)" : area.composition === "additive" ? "var(--map-additive-fill)" : area.role === "background" ? "var(--map-background-fill)" : "var(--map-lawn-fill)";
+  const stroke = selected ? "var(--map-selection)" : area.role === "bed" || area.surface === "dirt" ? "var(--map-dirt-stroke)" : area.composition === "additive" ? "var(--map-additive-stroke)" : "var(--map-lawn-stroke)";
   return (
     <g {...select} className="map-object">
       <ShapeSvg shape={area.shape} attrs={{ ...select, className: selected ? "selected-object" : "", fill, opacity: area.composition === "additive" ? 0.42 : area.role === "background" ? 0.24 : 0.68, stroke, strokeWidth: selected ? 0.08 : 0.06 }} />
@@ -18,12 +18,12 @@ export function AreaSvg({ area, path, selection }: { area: Area; path: number[];
 
 export function HillSvg({ hill, index, selection }: { hill: HeightFeature; index: number; selection: Selection }) {
   const selected = sameSelection(selection, { kind: "heightFeature", index });
-  return <ShapeSvg shape={hill.shape} attrs={{ ...selectAttrs({ kind: "heightFeature", index }), className: `map-object ${selected ? "selected-object" : ""}`, fill: "#d8d6c8", opacity: 0.42, stroke: selected ? "#2563eb" : "#77715c", strokeWidth: selected ? 0.08 : 0.06, strokeDasharray: "0.4 0.25" }} />;
+  return <ShapeSvg shape={hill.shape} attrs={{ ...selectAttrs({ kind: "heightFeature", index }), className: `map-object ${selected ? "selected-object" : ""}`, fill: "var(--map-hill-fill)", opacity: 0.42, stroke: selected ? "var(--map-selection)" : "var(--map-hill-stroke)", strokeWidth: selected ? 0.08 : 0.06, strokeDasharray: "0.4 0.25" }} />;
 }
 
 export function PathSvg({ shape, item, selection, color, width, className }: { shape: PathShape; item: Selection; selection: Selection; color: string; width: number; className: string }) {
   const selected = sameSelection(selection, item);
-  const attrs = { ...selectAttrs(item), className: `map-object ${className} ${selected ? "selected-object" : ""}`, fill: "none", stroke: selected ? "#2563eb" : color, strokeWidth: selected ? Math.max(width, 0.08) : width, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const attrs = { ...selectAttrs(item), className: `map-object ${className} ${selected ? "selected-object" : ""}`, fill: "none", stroke: selected ? "var(--map-selection)" : color, strokeWidth: selected ? Math.max(width, 0.08) : width, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   if (shape.type === "line") return <line {...attrs} x1={shape.start[0]} y1={shape.start[1]} x2={shape.end[0]} y2={shape.end[1]} />;
   if (shape.type === "polyline") return <polyline {...attrs} points={shape.points.map((point) => `${point[0]},${point[1]}`).join(" ")} />;
   return <path {...attrs} d={`M ${shape.start[0]} ${shape.start[1]} ${shape.curves.map((curve) => `C ${curve.c1[0]} ${curve.c1[1]}, ${curve.c2[0]} ${curve.c2[1]}, ${curve.end[0]} ${curve.end[1]}`).join(" ")}`} />;

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Point2 } from "../domain/model";
+import { Stack } from "./ui";
 
 type FieldProps = {
   label: string;
@@ -74,7 +75,7 @@ export function Section({ title, action, children }: { title: string; action?: R
         <h3>{title}</h3>
         {action}
       </div>
-      <div className="stack">{children}</div>
+      <Stack>{children}</Stack>
     </div>
   );
 }

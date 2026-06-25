@@ -18,6 +18,7 @@ import { SnapControls } from "./SnapControls";
 import { SettingsDialog } from "./SettingsDialog";
 import { Viewport } from "./Viewport";
 import { ViewportToolbar } from "./ViewportToolbar";
+import { Panel, PanelHeader, StatusMessage } from "./ui";
 
 export function App() {
   const [state, setState] = useState<EditorState>(() => ({
@@ -48,6 +49,7 @@ export function App() {
   const bounds = state.activeViewportBounds ?? computedBounds;
   const exportValue = useMemo(() => JSON.stringify(exportJsonValue(state.pack), null, 2), [state.pack]);
   const jsonValue = state.jsonText || exportValue;
+  const theme = state.pack.editor?.theme ?? "light";
 
   const record = (updater: (current: EditorState) => EditorState, historyEntry = true) => {
     if (historyEntry) {
@@ -217,6 +219,10 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [history, redoHistory, state.pack]);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
   const loadJsonText = (text: string) => {
     try {
       const result = importJsonText(text);
@@ -254,7 +260,7 @@ export function App() {
   };
 
   return (
-    <main className={`app theme-${state.pack.editor?.theme ?? "light"} ${state.sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${state.importPanelOpen ? "import-is-open" : ""}`}>
+    <main className={`app theme-${theme} ${state.sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${state.importPanelOpen ? "import-is-open" : ""}`}>
       <AppTopBar
         sidebarCollapsed={state.sidebarCollapsed}
         rightSidebarOpen={state.importPanelOpen}
@@ -263,7 +269,7 @@ export function App() {
         onOpenBlueprints={() => setBlueprintsOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <aside className={`panel sidebar-panel ${state.sidebarCollapsed ? "collapsed" : ""}`}>
+      <Panel as="aside" className={`sidebar-panel ${state.sidebarCollapsed ? "collapsed" : ""}`}>
         <Sidebar
           level={level}
           selection={state.selection}
@@ -274,22 +280,22 @@ export function App() {
           onAdd={addFromTree}
           inspector={<Inspector level={level} selection={state.selection} onUpdateLevel={updateLevel} onUpdateArea={updateArea} onDeleteSelection={() => deleteSelection()} />}
         />
-      </aside>
-      <section className="panel canvas-panel">
+      </Panel>
+      <Panel className="canvas-panel">
         <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} canUndo={history.length > 0} canRedo={redoHistory.length > 0} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} onUndo={undo} onRedo={redo} />
         <div className="map-wrap">
           <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
           <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
         </div>
-        <div className="status">{validation.length === 0 ? <div className="ok">Draft v1 shape validates for the checks currently implemented.</div> : validation.map((error) => <div key={error} className="error">{error}</div>)}</div>
-      </section>
+        <div className="status">{validation.length === 0 ? <StatusMessage>Draft v1 shape validates for the checks currently implemented.</StatusMessage> : validation.map((error) => <StatusMessage key={error} tone="error">{error}</StatusMessage>)}</div>
+      </Panel>
       {state.importPanelOpen ? (
-        <aside className="panel import-panel">
-          <div className="panel-header">
+        <Panel as="aside" className="import-panel">
+          <PanelHeader>
             <h2>Import / Export</h2>
-          </div>
+          </PanelHeader>
           <ImportExportPane pack={state.pack} value={jsonValue} message={state.importMessage} samples={samplePacks} onJsonText={(jsonText) => setState((current) => ({ ...current, jsonText }))} onCopy={() => navigator.clipboard.writeText(jsonValue).then(() => setState((current) => ({ ...current, importMessage: "Copied JSON to clipboard." })))} onDownload={downloadJson} onLoadJson={() => loadJsonText(jsonValue)} onOpenFile={(file) => file.text().then(loadJsonText).catch((error) => setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON file." })))} onRevert={revertLoadedPack} onLoadSample={loadSample} />
-        </aside>
+        </Panel>
       ) : null}
       <BlueprintsDialog
         open={blueprintsOpen}
@@ -302,7 +308,7 @@ export function App() {
         onDeleteBlueprint={(key) => updateBlueprints((items) => items.filter((item) => item.key !== key))}
         onClose={() => setBlueprintsOpen(false)}
       />
-      <SettingsDialog open={settingsOpen} theme={state.pack.editor?.theme ?? "light"} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog open={settingsOpen} theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
       <ContextMenu menu={state.contextMenu} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} onClose={() => setState((current) => ({ ...current, contextMenu: null }))} onSelect={(selection: Selection) => setState((current) => ({ ...current, selection, contextMenu: null }))} onDuplicate={duplicateSelection} onDelete={(selection) => deleteSelection(selection)} onMoveSpawn={() => state.contextMenu && updateLevel((current) => ({ ...current, spawn: { ...current.spawn, position: state.contextMenu!.world } }))} onAddArea={() => state.contextMenu && addArea(state.contextMenu.world)} onAddChildArea={() => state.contextMenu && addArea(state.contextMenu.world, state.contextMenu.target?.kind === "area" ? state.contextMenu.target.path : state.selection.kind === "area" ? state.selection.path : undefined)} onAddBlueprint={(key) => state.contextMenu && addBlueprint(key, state.contextMenu.world)} onStartFence={() => state.contextMenu && pathToolClick("fence", state.contextMenu.world)} onAddRoad={() => state.contextMenu && addPathItem("road", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddDirtPath={() => state.contextMenu && addPathItem("dirtPath", [state.contextMenu.world[0] - 2, state.contextMenu.world[1]], [state.contextMenu.world[0] + 2, state.contextMenu.world[1]])} onAddHill={() => state.contextMenu && addHill(state.contextMenu.world)} />
     </main>
   );

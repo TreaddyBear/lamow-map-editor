@@ -1,5 +1,5 @@
 import { SelectField } from "./formControls";
-import { Dialog } from "./ui";
+import { Dialog, PanelBody, Stack } from "./ui";
 
 type Props = {
   open: boolean;
@@ -11,7 +11,8 @@ type Props = {
 export function SettingsDialog({ open, theme, onTheme, onClose }: Props) {
   return (
     <Dialog open={open} title="Settings" onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <div className="panel-body stack">
+      <PanelBody>
+        <Stack>
         <SelectField
           label="theme"
           value={theme}
@@ -21,7 +22,8 @@ export function SettingsDialog({ open, theme, onTheme, onClose }: Props) {
           ]}
           onChange={(value) => onTheme(value === "dark" ? "dark" : "light")}
         />
-      </div>
+        </Stack>
+      </PanelBody>
     </Dialog>
   );
 }

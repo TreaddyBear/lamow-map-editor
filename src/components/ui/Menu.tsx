@@ -37,7 +37,7 @@ export function MenuLabel({ children }: { children: ReactNode }) {
   return <DropdownMenu.Label className={menuLabelClass}>{children}</DropdownMenu.Label>;
 }
 
-export const menuContentClass = "z-20 grid min-w-48 gap-0.5 rounded-lg border border-[#9eb397] bg-white p-1.5 shadow-[0_12px_30px_rgb(31_49_27_/_18%)]";
-export const menuItemClass = "cursor-pointer rounded-[5px] px-2.5 py-2 text-sm font-semibold text-[#162216] outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.45] data-[highlighted]:bg-[#edf6e9]";
-export const menuLabelClass = "px-2.5 pb-0.5 pt-1 text-[0.68rem] font-black uppercase tracking-[0.04em] text-[#61715d]";
-export const menuSeparatorClass = "my-0.5 h-px bg-[#dbe8d5]";
+export const menuContentClass = "z-20 grid min-w-48 gap-0.5 rounded-lg border border-[var(--input-border)] bg-[var(--surface-bg)] p-1.5 shadow-[0_12px_30px_rgb(31_49_27_/_18%)]";
+export const menuItemClass = "cursor-pointer rounded-[5px] px-2.5 py-2 text-sm font-semibold text-[var(--app-text)] outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-[0.45] data-[highlighted]:bg-[var(--subtle-bg)]";
+export const menuLabelClass = "px-2.5 pb-0.5 pt-1 text-[0.68rem] font-black uppercase tracking-[0.04em] text-[var(--muted-text)]";
+export const menuSeparatorClass = "my-0.5 h-px bg-[var(--surface-border)]";

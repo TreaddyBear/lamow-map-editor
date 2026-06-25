@@ -1,10 +1,11 @@
 import type { SamplePack } from "../domain/samplePacks";
 import type { MapPackV1 } from "../domain/model";
-import { ActionRow, Button, FileButton, Menu, MenuItem } from "./ui";
+import { ActionRow, Button, FileButton, Menu, MenuItem, PanelBody, Stack, StatusMessage } from "./ui";
 
 export function ImportExportPane({ value, message, samples, onJsonText, onCopy, onDownload, onLoadJson, onOpenFile, onRevert, onLoadSample }: { value: string; message: string; pack: MapPackV1; samples: SamplePack[]; onJsonText: (value: string) => void; onCopy: () => void; onDownload: () => void; onLoadJson: () => void; onOpenFile: (file: File) => void; onRevert: () => void; onLoadSample: (key: string) => void }) {
   return (
-    <div className="panel-body stack">
+    <PanelBody>
+      <Stack>
       <ActionRow className="io-actions">
         <FileButton accept="application/json,.json,.txt,text/plain" onFile={onOpenFile}>Import</FileButton>
         <Button tone="primary" type="button" onClick={onDownload}>Export</Button>
@@ -16,12 +17,13 @@ export function ImportExportPane({ value, message, samples, onJsonText, onCopy, 
       </ActionRow>
       <details className="raw-json-pane">
         <summary>Raw JSON</summary>
-        <div className="stack">
+        <Stack>
           <textarea spellCheck={false} value={value} onChange={(event) => onJsonText(event.currentTarget.value)} />
           <Button type="button" onClick={onLoadJson}>Load pasted JSON</Button>
-        </div>
+        </Stack>
       </details>
-      {message ? <div className={["Imported", "Copied", "Exported", "Reverted", "Loaded"].some((word) => message.startsWith(word)) ? "ok" : "error"}>{message}</div> : null}
-    </div>
+      {message ? <StatusMessage tone={["Imported", "Copied", "Exported", "Reverted", "Loaded"].some((word) => message.startsWith(word)) ? "ok" : "error"}>{message}</StatusMessage> : null}
+      </Stack>
+    </PanelBody>
   );
 }
