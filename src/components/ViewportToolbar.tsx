@@ -1,4 +1,4 @@
-import { Fence as FenceIcon, Mountain, MousePointer2, Plus, Route, Square, Waypoints } from "lucide-react";
+import { Fence as FenceIcon, Mountain, MousePointer2, Plus, Redo2, Route, Square, Undo2, Waypoints } from "lucide-react";
 import { areaBlueprints } from "../domain/blueprints";
 import type { CanvasTool } from "../domain/model";
 import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator } from "./ui";
@@ -6,16 +6,20 @@ import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator } from "./u
 type Props = {
   activeTool: CanvasTool;
   pinnedAreaBlueprintKeys: string[];
+  canUndo: boolean;
+  canRedo: boolean;
   onTool: (tool: CanvasTool) => void;
   onAdd: (kind: "area" | "road" | "dirtPath" | "fence" | "hill") => void;
   onAddBlueprintAtOrigin: (key: string) => void;
+  onUndo: () => void;
+  onRedo: () => void;
 };
 
-export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, onTool, onAdd, onAddBlueprintAtOrigin }: Props) {
+export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, canUndo, canRedo, onTool, onAdd, onAddBlueprintAtOrigin, onUndo, onRedo }: Props) {
   const pinned = pinnedAreaBlueprintKeys.map((key) => areaBlueprints.find((item) => item.key === key)).filter((item): item is (typeof areaBlueprints)[number] => Boolean(item));
   return (
     <div className="viewport-toolbar">
-      <ActionRow>
+      <ActionRow className="toolbar-left">
         <Button className="icon-button" tone={activeTool === "select" ? "primary" : "default"} type="button" title="Select" onClick={() => onTool("select")}><MousePointer2 /></Button>
         <Menu trigger={<Button className="icon-button" type="button" title="Add"><Plus /></Button>}>
           <MenuItem onSelect={() => onAdd("area")}><span className="menu-item-icon"><Square />Lawn area</span></MenuItem>
@@ -32,6 +36,10 @@ export function ViewportToolbar({ activeTool, pinnedAreaBlueprintKeys, onTool, o
         <Button className="icon-button" tone={activeTool === "road" ? "primary" : "default"} type="button" title="Draw road" onClick={() => onTool("road")}><Route /></Button>
         <Button className="icon-button" tone={activeTool === "dirtPath" ? "primary" : "default"} type="button" title="Draw dirt path" onClick={() => onTool("dirtPath")}><Waypoints /></Button>
         <Button className="icon-button" tone={activeTool === "hill" ? "primary" : "default"} type="button" title="Add hills by clicking" onClick={() => onTool("hill")}><Mountain /></Button>
+      </ActionRow>
+      <ActionRow className="toolbar-right">
+        <Button className="icon-button" type="button" disabled={!canUndo} title="Undo" onClick={onUndo}><Undo2 /></Button>
+        <Button className="icon-button" type="button" disabled={!canRedo} title="Redo" onClick={onRedo}><Redo2 /></Button>
       </ActionRow>
     </div>
   );

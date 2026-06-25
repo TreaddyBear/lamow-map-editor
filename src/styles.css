@@ -132,11 +132,13 @@ textarea {
   border: 1px solid #c9d9c2;
   border-radius: 8px;
   background: #f8fbf6;
-  padding: 0.55rem 0.7rem;
+  padding: 0.35rem 0.7rem;
 }
 
 .app-topbar strong {
-  font-size: 0.98rem;
+  font-size: 1.85rem;
+  font-weight: 300;
+  line-height: 1;
 }
 
 .topbar-left,
@@ -308,10 +310,6 @@ label {
   font-weight: 800;
 }
 
-.level-row button {
-  padding: 0.22rem 0.5rem;
-}
-
 .checkbox-label {
   display: flex;
   grid-template-columns: none;
@@ -332,6 +330,27 @@ label {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   border-radius: 4px;
+  position: relative;
+}
+
+.tree-row::before {
+  content: "";
+  position: absolute;
+  left: calc(0.92rem + (var(--depth) * 1rem));
+  top: -1px;
+  bottom: -1px;
+  border-left: 1px solid #d2dfcc;
+  pointer-events: none;
+}
+
+.tree-row::after {
+  content: "";
+  position: absolute;
+  left: calc(0.92rem + (var(--depth) * 1rem));
+  top: 50%;
+  width: 0.55rem;
+  border-top: 1px solid #d2dfcc;
+  pointer-events: none;
 }
 
 .tree-row.active {
@@ -340,7 +359,7 @@ label {
 
 .tree-item {
   display: grid;
-  grid-template-columns: 1.2rem minmax(0, 1fr);
+  grid-template-columns: 1.35rem minmax(0, 1fr);
   align-items: center;
   gap: 0.3rem;
   min-width: 0;
@@ -350,16 +369,31 @@ label {
   font-weight: 550;
   padding: 0.24rem 0.32rem 0.24rem calc(0.32rem + (var(--depth) * 1rem));
   text-align: left;
+  position: relative;
+  z-index: 1;
 }
 
-.tree-delete {
-  width: 1.35rem;
-  height: 1.35rem;
-  margin-right: 0.15rem;
+.tree-action {
+  display: inline-grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
   border-color: transparent;
   background: transparent;
   padding: 0;
   line-height: 1;
+}
+
+.tree-action svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  stroke-width: 2.2;
+}
+
+.tree-delete {
+  margin-right: 0.15rem;
+  position: relative;
+  z-index: 1;
 }
 
 .tree-delete:hover {
@@ -368,7 +402,16 @@ label {
 }
 
 .tree-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid #bfd0b8;
+  border-radius: 999px;
+  background: #ffffff;
   color: #52714d;
+  font-size: 0.66rem;
+  font-weight: 900;
   text-align: center;
 }
 
@@ -396,10 +439,10 @@ label {
   text-transform: uppercase;
 }
 
-.tree-folder button {
-  padding: 0.08rem 0.35rem;
-  font-size: 0.68rem;
-  line-height: 1.2;
+.tree-folder svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  stroke-width: 2.4;
 }
 
 .map-object {
@@ -563,9 +606,15 @@ label {
 .viewport-toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   border-bottom: 1px solid #d8e3d3;
   padding: 0.55rem 0.7rem;
+}
+
+.toolbar-left,
+.toolbar-right {
+  align-items: center;
 }
 
 .menu-content {
@@ -688,8 +737,8 @@ label {
 .zoom-widget {
   position: absolute;
   z-index: 4;
-  top: 1.7rem;
-  left: min(31rem, calc(100% - 13rem));
+  right: calc(1.7rem + 12rem + 1.7rem);
+  bottom: 1.7rem;
   display: flex;
   gap: 0.35rem;
   border: 1px solid #b8c9b2;
@@ -752,10 +801,81 @@ label {
   min-height: 0;
 }
 
+.io-actions {
+  align-items: center;
+}
+
+.io-actions button,
+.io-actions .file-button {
+  min-height: 0;
+  font-size: 0.82rem;
+  line-height: 1.1;
+  padding: 0.34rem 0.55rem;
+}
+
+.raw-json-pane {
+  border: 1px solid #d2dfcc;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.raw-json-pane summary {
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0.55rem 0.7rem;
+}
+
+.raw-json-pane .stack {
+  padding: 0 0.7rem 0.7rem;
+}
+
+.raw-json-pane textarea {
+  min-height: 18rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .hint {
   color: #60705d;
   font-size: 0.82rem;
   line-height: 1.35;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgb(20 32 22 / 28%);
+  padding: 1rem;
+}
+
+.dialog-panel {
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: min(34rem, calc(100vh - 2rem));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid #b8c9b2;
+  border-radius: 8px;
+  background: #f8fbf6;
+  box-shadow: 0 18px 60px rgb(31 49 27 / 24%);
+  overflow: hidden;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #d8e3d3;
+  padding: 0.65rem 0.75rem;
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .status {
