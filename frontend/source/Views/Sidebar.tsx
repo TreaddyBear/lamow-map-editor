@@ -1,5 +1,5 @@
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Area, LevelV1, Selection } from "../utilities/domain/model";
 import type { SidebarPanes } from "../utilities/editor/types";
 import { pointLabel, sameSelection } from "../utilities/editor/utils";
@@ -30,7 +30,7 @@ export function Sidebar({ level, selection, panes, onPaneToggle, onSelect, onDel
             <TreeButton item={{ kind: "level" }} active={sameSelection(selection, { kind: "level" })} icon="L" label={`${level.name} / ${level.code}`} onSelect={onSelect} />
             <TreeButton item={{ kind: "spawn" }} active={sameSelection(selection, { kind: "spawn" })} icon="S" label={`spawn (${pointLabel(level.spawn.position)})`} onSelect={onSelect} />
             <TreeFolder label="areas" onAdd={() => onAdd("area")} />
-            {level.areas.map((area, index) => <AreaTree key={`${area.id}-${index}`} area={area} path={[index]} depth={2} selection={selection} onSelect={onSelect} onDelete={onDelete} />)}
+            {level.areas.map((area, index) => <AreaTree key={`${area.id}-${index}`} area={area} path={[index]} depth={2} parentDepth={1} selection={selection} onSelect={onSelect} onDelete={onDelete} />)}
             <TreeFolder label="roads" onAdd={() => onAdd("road")} />
             {level.roads.map((road, index) => <TreeButton key={road.id} item={{ kind: "road", index }} active={sameSelection(selection, { kind: "road", index })} icon="R" label={`${road.id} (${road.width}m)`} onSelect={onSelect} onDelete={onDelete} />)}
             <TreeFolder label="dirt paths" onAdd={() => onAdd("dirtPath")} />
@@ -60,10 +60,10 @@ function TreeFolder({ label, onAdd }: { label: string; onAdd: () => void }) {
   );
 }
 
-function TreeButton({ item, active, icon, label, onSelect, onDelete, depth = 1 }: { item: Selection; active: boolean; icon: string; label: string; onSelect: (selection: Selection) => void; onDelete?: (selection: Selection) => void; depth?: number }) {
-  const depthClass = treeDepthClasses[Math.min(depth, 8) - 1] ?? treeDepthClasses.at(-1);
+function TreeButton({ item, active, icon, label, onSelect, onDelete, depth = 1, parentDepth }: { item: Selection; active: boolean; icon: string; label: string; onSelect: (selection: Selection) => void; onDelete?: (selection: Selection) => void; depth?: number; parentDepth?: number }) {
+  const style = treeDepthStyle(depth, parentDepth);
   return (
-    <div className={cn(treeRowClass, depthClass, active && "bg-[var(--subtle-bg)]")}>
+    <div className={cn(treeRowClass, parentDepth !== undefined && treeForkClass, active && "bg-[var(--subtle-bg)]")} style={style}>
       <button className={cn(treeItemClass, active && "border-[var(--map-lawn-stroke)] bg-[var(--subtle-bg)]")} type="button" onClick={() => onSelect(item)}>
         <span className="inline-grid h-5 w-5 place-items-center rounded-full border border-[var(--surface-border)] bg-[var(--input-bg)] text-center text-[0.66rem] font-black text-[var(--muted-text)]">{icon}</span>
         <span className="overflow-hidden text-ellipsis whitespace-nowrap">{label}</span>
@@ -81,29 +81,51 @@ function TreeAction({ children, className = "", title, onClick }: { children: Re
   );
 }
 
-const treeRowClass = "relative grid grid-cols-[minmax(0,1fr)_auto] items-center rounded before:pointer-events-none before:absolute before:bottom-[-1px] before:left-[var(--tree-line-offset)] before:top-[-1px] before:border-l before:border-[var(--surface-border)] before:content-[''] after:pointer-events-none after:absolute after:left-[var(--tree-line-offset)] after:top-1/2 after:w-2 after:border-t after:border-[var(--surface-border)] after:content-['']";
+const treeRowClass = "relative grid grid-cols-[minmax(0,1fr)_auto] items-center rounded before:pointer-events-none before:absolute before:bottom-[-1px] before:left-[var(--tree-line-offset)] before:top-[-1px] before:border-l before:border-[var(--surface-border)] before:content-[''] after:pointer-events-none after:absolute after:left-[var(--tree-line-offset)] after:top-1/2 after:w-[var(--tree-elbow-width)] after:border-t after:border-[var(--surface-border)] after:content-['']";
+const treeForkClass = "after:left-[var(--tree-parent-line-offset)] after:w-[var(--tree-fork-width)]";
 const treeItemClass = "relative z-[1] grid min-w-0 grid-cols-[1.35rem_minmax(0,1fr)] items-center gap-1 rounded border border-transparent bg-transparent py-1 pr-1 pl-[var(--tree-item-indent)] text-left font-medium";
-const treeDepthClasses = [
-  "[--tree-line-offset:1.92rem] [--tree-item-indent:1.32rem]",
-  "[--tree-line-offset:2.92rem] [--tree-item-indent:2.32rem]",
-  "[--tree-line-offset:3.92rem] [--tree-item-indent:3.32rem]",
-  "[--tree-line-offset:4.92rem] [--tree-item-indent:4.32rem]",
-  "[--tree-line-offset:5.92rem] [--tree-item-indent:5.32rem]",
-  "[--tree-line-offset:6.92rem] [--tree-item-indent:6.32rem]",
-  "[--tree-line-offset:7.92rem] [--tree-item-indent:7.32rem]",
-  "[--tree-line-offset:8.92rem] [--tree-item-indent:8.32rem]",
-];
+const treeBranchClass = "relative before:pointer-events-none before:absolute before:bottom-3 before:left-[var(--tree-branch-line-offset)] before:top-[-0.15rem] before:border-l before:border-[var(--surface-border)] before:content-['']";
+const treeBaseLineOffset = 1.32;
+const treeDepthStep = 0.82;
+const treeIconPadding = 0.6;
+const treeElbowWidth = 0.44;
 
-function AreaTree({ area, path, depth, selection, onSelect, onDelete }: { area: Area; path: number[]; depth: number; selection: Selection; onSelect: (selection: Selection) => void; onDelete: (selection: Selection) => void }) {
+function treeDepthStyle(depth: number, parentDepth?: number): CSSProperties {
+  const lineOffset = treeLineOffset(depth);
+  const parentLineOffset = parentDepth === undefined ? lineOffset : treeLineOffset(parentDepth);
+
+  return {
+    "--tree-line-offset": `${lineOffset}rem`,
+    "--tree-parent-line-offset": `${parentLineOffset}rem`,
+    "--tree-fork-width": `${Math.max(lineOffset - parentLineOffset, treeElbowWidth)}rem`,
+    "--tree-elbow-width": `${treeElbowWidth}rem`,
+    "--tree-item-indent": `${lineOffset - treeIconPadding}rem`,
+  } as CSSProperties;
+}
+
+function treeBranchStyle(depth: number): CSSProperties {
+  return { "--tree-branch-line-offset": `${treeLineOffset(depth)}rem` } as CSSProperties;
+}
+
+function treeLineOffset(depth: number) {
+  return treeBaseLineOffset + (Math.max(depth, 1) - 1) * treeDepthStep;
+}
+
+function AreaTree({ area, path, depth, parentDepth, selection, onSelect, onDelete }: { area: Area; path: number[]; depth: number; parentDepth: number; selection: Selection; onSelect: (selection: Selection) => void; onDelete: (selection: Selection) => void }) {
   const item: Selection = { kind: "area", path };
+  const children = area.children ?? [];
   return (
     <>
-      <TreeButton item={item} active={sameSelection(selection, item)} icon="A" label={`${area.id}${area.role ? ` ${area.role}` : ""} (${area.shape.type})`} depth={depth} onSelect={onSelect} onDelete={onDelete} />
-      {area.vegetation.map((layer, index) => {
-        const vegetation: Selection = { kind: "vegetation", path, vegetationIndex: index };
-        return <TreeButton key={`${layer.id}-${index}`} item={vegetation} active={sameSelection(selection, vegetation)} icon="V" label={`${layer.id}: ${layer.type}`} depth={depth + 1} onSelect={onSelect} onDelete={onDelete} />;
-      })}
-      {(area.children ?? []).map((child, index) => <AreaTree key={`${child.id}-${index}`} area={child} path={[...path, index]} depth={depth + 1} selection={selection} onSelect={onSelect} onDelete={onDelete} />)}
+      <TreeButton item={item} active={sameSelection(selection, item)} icon="A" label={`${area.id}${area.role ? ` ${area.role}` : ""} (${area.shape.type})`} depth={depth} parentDepth={parentDepth} onSelect={onSelect} onDelete={onDelete} />
+      {area.vegetation.length || children.length ? (
+        <div className={treeBranchClass} style={treeBranchStyle(depth)}>
+          {area.vegetation.map((layer, index) => {
+            const vegetation: Selection = { kind: "vegetation", path, vegetationIndex: index };
+            return <TreeButton key={`${layer.id}-${index}`} item={vegetation} active={sameSelection(selection, vegetation)} icon="V" label={`${layer.id}: ${layer.type}`} depth={depth + 1} parentDepth={depth} onSelect={onSelect} onDelete={onDelete} />;
+          })}
+          {children.map((child, index) => <AreaTree key={`${child.id}-${index}`} area={child} path={[...path, index]} depth={depth + 1} parentDepth={depth} selection={selection} onSelect={onSelect} onDelete={onDelete} />)}
+        </div>
+      ) : null}
     </>
   );
 }

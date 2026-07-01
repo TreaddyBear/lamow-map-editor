@@ -49,6 +49,17 @@ body,
   @apply h-full w-full overflow-hidden;
 }
 
+#app {
+  user-select: none;
+}
+
+#app input,
+#app textarea,
+#app select,
+#app [contenteditable="true"] {
+  user-select: text;
+}
+
 .theme-dark,
 :root[data-theme="dark"] {
   --app-bg: #111a12;

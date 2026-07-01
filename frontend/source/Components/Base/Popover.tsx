@@ -7,14 +7,16 @@ type PopoverProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   align?: "start" | "center" | "end";
+  side?: "top" | "right" | "bottom" | "left";
+  className?: string;
 };
 
-export function Popover({ trigger, children, open, onOpenChange, align = "start" }: PopoverProps) {
+export function Popover({ trigger, children, open, onOpenChange, align = "start", side = "bottom", className = "" }: PopoverProps) {
   return (
     <RadixPopover.Root open={open} onOpenChange={onOpenChange}>
       <RadixPopover.Trigger asChild>{trigger}</RadixPopover.Trigger>
       <RadixPopover.Portal>
-        <RadixPopover.Content className="z-[25]" align={align} sideOffset={6}>
+        <RadixPopover.Content className={`z-[25] ${className}`} align={align} side={side} sideOffset={6}>
           {children}
         </RadixPopover.Content>
       </RadixPopover.Portal>

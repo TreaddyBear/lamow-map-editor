@@ -1,4 +1,5 @@
 import type { HTMLAttributes, ReactNode, SVGProps } from "react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "./cn";
 
 export function AppShell({ leftCollapsed, rightOpen, children }: { leftCollapsed: boolean; rightOpen: boolean; children: ReactNode }) {
@@ -79,9 +80,12 @@ export function MinimapSurface({ children, ...props }: SVGProps<SVGSVGElement> &
 
 export function DisclosurePane({ title, open, onOpenChange, children }: { title: string; open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
   return (
-    <details className="border-b border-[var(--surface-border)] [&[open]>summary]:border-b [&[open]>summary]:border-[var(--surface-border)]" open={open} onToggle={(event) => onOpenChange(event.currentTarget.open)}>
-      <summary className="cursor-pointer bg-[var(--subtle-bg)] px-3.5 py-3 font-extrabold marker:text-[var(--muted-text)]">{title}</summary>
-      {children}
-    </details>
+    <section className="border-b border-[var(--surface-border)]">
+      <button className={cn("grid w-full grid-cols-[1rem_minmax(0,1fr)] items-center gap-1 bg-[var(--subtle-bg)] px-3.5 py-3 text-left font-extrabold", open && "border-b border-[var(--surface-border)]")} type="button" aria-expanded={open} onClick={() => onOpenChange(!open)}>
+        <ChevronDown className={cn("h-4 w-4 text-[var(--muted-text)] transition-transform", !open && "-rotate-90")} />
+        <span>{title}</span>
+      </button>
+      {open ? children : null}
+    </section>
   );
 }

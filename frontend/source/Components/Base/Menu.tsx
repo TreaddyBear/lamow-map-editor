@@ -6,11 +6,13 @@ type MenuProps = {
   trigger: ReactNode;
   children: ReactNode;
   align?: "start" | "center" | "end";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
-export function Menu({ trigger, children, align = "start" }: MenuProps) {
+export function Menu({ trigger, children, align = "start", open, onOpenChange }: MenuProps) {
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root open={open} onOpenChange={onOpenChange}>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className={menuContentClass} align={align} sideOffset={6}>

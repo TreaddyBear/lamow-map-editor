@@ -19,8 +19,13 @@ import { SettingsDialog } from "../Views/SettingsDialog";
 import { Viewport } from "../Views/Viewport";
 import { ViewportToolbar } from "../Views/ViewportToolbar";
 import { AppShell, CanvasPanelLayout, FloatingAsideLayout, MapStage, Panel, PanelHeader, SidebarSlot, StatusMessage, StatusStrip } from "../Components/Base";
+import type { AppView } from "./App";
 
-export function EditorPage() {
+type EditorPageProps = {
+  onViewChange: (view: AppView) => void;
+};
+
+export function EditorPage({ onViewChange }: EditorPageProps) {
   const [state, setState] = useState<EditorState>(() => ({
     pack: clone(defaultPack),
     selectedLevelIndex: 0,
@@ -264,6 +269,7 @@ export function EditorPage() {
       <AppTopBar
         sidebarCollapsed={state.sidebarCollapsed}
         rightSidebarOpen={state.importPanelOpen}
+        onViewChange={onViewChange}
         onToggleSidebar={() => setState((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }))}
         onToggleRightSidebar={() => setState((current) => ({ ...current, importPanelOpen: !current.importPanelOpen }))}
         onOpenBlueprints={() => setBlueprintsOpen(true)}
