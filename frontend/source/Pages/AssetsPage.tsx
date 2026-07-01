@@ -9,6 +9,7 @@ import {
   fieldFlowerShapeToRecipe,
   parseVegetationAsset,
   recipeToFieldFlowerShape,
+  type BranchPhrase,
   type ColorHex,
   type CountVariation,
   type FormPhrase,
@@ -199,7 +200,7 @@ export function AssetsPage({ onOpenMapEditor }: Props) {
   };
 
   return (
-    <main className="grid h-screen max-h-screen gap-4 overflow-hidden p-4 [grid-template-rows:auto_minmax(0,1fr)] [grid-template-columns:minmax(300px,390px)_minmax(0,1fr)_minmax(320px,400px)] max-[820px]:h-auto max-[820px]:max-h-none max-[820px]:overflow-auto max-[820px]:[grid-template-columns:1fr] max-[820px]:[grid-template-rows:auto_auto_auto_auto]">
+    <main data-testid="asset-editor" className="grid h-screen max-h-screen gap-4 overflow-hidden p-4 [grid-template-rows:auto_minmax(0,1fr)] [grid-template-columns:minmax(300px,390px)_minmax(0,1fr)_minmax(320px,400px)] max-[820px]:h-auto max-[820px]:max-h-none max-[820px]:overflow-auto max-[820px]:[grid-template-columns:1fr] max-[820px]:[grid-template-rows:auto_auto_auto_auto]">
       <TopBar className="col-span-full">
         <ActionRow className="items-center">
           <Menu trigger={<Button size="icon" type="button" title="App menu"><MenuIcon /></Button>}>
@@ -261,7 +262,7 @@ export function AssetsPage({ onOpenMapEditor }: Props) {
             <TextField label="Display name" value={asset.species.displayName} onChange={(displayName) => updateAsset((current) => ({ ...current, species: { ...current.species, displayName } }))} />
             <AddPhrasePalette materials={Object.keys(asset.species.materials)} onAdd={addRootPhrase} />
             <div className="rounded-md bg-[var(--subtle-bg)] px-3 py-2 text-sm text-[var(--muted-text)]">
-              A recipe is a growing cursor. It can continue, fork into alike continuations, branch off different offshoots, steer, or form geometry.
+              A recipe grows forward, curves as needed, forks into alike paths, branches off different paths, or forms geometry at the current point.
             </div>
             {shape.type !== "fieldFlower" ? (
               <div className="rounded-md bg-[var(--subtle-bg)] px-3 py-2 text-sm text-[var(--muted-text)]">
@@ -434,7 +435,7 @@ function PhraseTree({
         <button className="min-w-0 truncate py-1 text-left" type="button" onClick={() => onSelect(phrase.id)}>
           {phrase.label}
         </button>
-        <span className="text-xs uppercase text-[var(--muted-text)]">{phrase.type}</span>
+        <span className="text-xs uppercase text-[var(--muted-text)]">{phraseTypeLabel(phrase.type)}</span>
       </div>
       {nested.map((child) => (
         <PhraseTree
@@ -463,10 +464,16 @@ function PhraseIcon({ type }: { type: GrowthPhrase["type"] }) {
   return <Plus className="h-4 w-4" />;
 }
 
+function phraseTypeLabel(type: GrowthPhrase["type"]) {
+  if (type === "continue") return "grow";
+  if (type === "steer") return "turn";
+  return type;
+}
+
 function AddPhrasePalette({ materials, title = "Add root phrase", onAdd }: { materials: string[]; title?: string; onAdd: (phrase: GrowthPhrase) => void }) {
   const items = [
-    { label: "Continue", factory: makeContinuePhrase, icon: <Sprout className="mr-1 h-4 w-4" /> },
-    { label: "Steer", factory: makeSteerPhrase, icon: <Plus className="mr-1 h-4 w-4" /> },
+    { label: "Grow", factory: makeContinuePhrase, icon: <Sprout className="mr-1 h-4 w-4" /> },
+    { label: "Turn", factory: makeSteerPhrase, icon: <Plus className="mr-1 h-4 w-4" /> },
     { label: "Fork", factory: makeForkPhrase, icon: <Split className="mr-1 h-4 w-4" /> },
     { label: "Branch", factory: makeBranchPhrase, icon: <GitBranch className="mr-1 h-4 w-4" /> },
     { label: "Form", factory: makeFormPhrase, icon: <Plus className="mr-1 h-4 w-4" /> },
@@ -485,10 +492,10 @@ function AddPhrasePalette({ materials, title = "Add root phrase", onAdd }: { mat
 
 function AddPhraseButton({ label, factory, icon, materials, onAdd }: { label: string; factory: () => GrowthPhrase; icon: ReactNode; materials: string[]; onAdd: (phrase: GrowthPhrase) => void }) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<GrowthPhrase>(() => factory());
+  const [draft, setDraft] = useState<GrowthPhrase>(() => prepareNewPhrase(factory(), materials));
   const openChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
-    if (nextOpen) setDraft(factory());
+    if (nextOpen) setDraft(prepareNewPhrase(factory(), materials));
   };
   return (
     <Popover
@@ -523,37 +530,51 @@ function AddPhraseButton({ label, factory, icon, materials, onAdd }: { label: st
   );
 }
 
+function prepareNewPhrase(phrase: GrowthPhrase, materials: string[]): GrowthPhrase {
+  const preferredMaterial = materials.includes("petal") ? "petal" : materials[0] ?? "petal";
+  if (phrase.type === "form") return { ...phrase, materialId: materials.includes(phrase.materialId) ? phrase.materialId : preferredMaterial };
+  if (phrase.type === "fork") return { ...phrase, continuation: phrase.continuation.map((child) => prepareNewPhrase(child, materials)) };
+  if (phrase.type === "branch") return { ...phrase, offshoot: phrase.offshoot.map((child) => prepareNewPhrase(child, materials)) };
+  if (phrase.type === "choose") return { ...phrase, options: phrase.options.map((option) => ({ ...option, phrase: option.phrase.map((child) => prepareNewPhrase(child, materials)) })) };
+  if (phrase.type === "color") return { ...phrase, materialId: materials.includes(phrase.materialId) ? phrase.materialId : preferredMaterial };
+  return phrase;
+}
+
 function PhraseDraftFields({ phrase, materials, onChange }: { phrase: GrowthPhrase; materials: string[]; onChange: (phrase: GrowthPhrase) => void }) {
   return (
     <Stack>
       <InlineTextField label="Label" value={phrase.label} onChange={(label) => onChange({ ...phrase, label })} />
       {phrase.type === "continue" ? (
         <>
-          <VariationField label="Distance" value={phrase.distance} onChange={(distance) => onChange({ ...phrase, distance })} />
-          <VariationField label="Start radius" value={phrase.radiusStart ?? { ideal: 0.01, deviation: 0 }} onChange={(radiusStart) => onChange({ ...phrase, radiusStart })} />
-          <VariationField label="End radius" value={phrase.radiusEnd ?? { ideal: 0.006, deviation: 0 }} onChange={(radiusEnd) => onChange({ ...phrase, radiusEnd })} />
+          <VariationField label="Distance" value={phrase.distance} step={0.005} min={0} onChange={(distance) => onChange({ ...phrase, distance })} />
+          <VariationField label="Arc degrees" value={phrase.arcDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={0} max={180} deviationMax={180} onChange={(arcDegrees) => onChange({ ...phrase, arcDegrees })} />
+          <VariationField label="Arc direction" value={phrase.arcAzimuthDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={0} max={360} deviationMax={360} onChange={(arcAzimuthDegrees) => onChange({ ...phrase, arcAzimuthDegrees })} />
+          <VariationField label="Start radius" value={phrase.radiusStart ?? { ideal: 0.01, deviation: 0 }} step={0.001} min={0} onChange={(radiusStart) => onChange({ ...phrase, radiusStart })} />
+          <VariationField label="End radius" value={phrase.radiusEnd ?? { ideal: 0.006, deviation: 0 }} step={0.001} min={0} onChange={(radiusEnd) => onChange({ ...phrase, radiusEnd })} />
           <SelectField label="Form along path" value={phrase.formAlongPath ?? "none"} options={["none", "stemSkin", "blade"].map((value) => ({ value, label: value }))} onChange={(formAlongPath) => onChange({ ...phrase, formAlongPath: formAlongPath as "none" | "stemSkin" | "blade" })} />
         </>
       ) : null}
       {phrase.type === "steer" ? (
         <>
-          <VariationField label="Pitch degrees" value={phrase.pitchDegrees ?? { ideal: 0, deviation: 0 }} onChange={(pitchDegrees) => onChange({ ...phrase, pitchDegrees })} />
-          <VariationField label="Yaw degrees" value={phrase.yawDegrees ?? { ideal: 0, deviation: 0 }} onChange={(yawDegrees) => onChange({ ...phrase, yawDegrees })} />
-          <VariationField label="Roll degrees" value={phrase.rollDegrees ?? { ideal: 0, deviation: 0 }} onChange={(rollDegrees) => onChange({ ...phrase, rollDegrees })} />
+          <VariationField label="Pitch degrees" value={phrase.pitchDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-180} max={180} deviationMax={180} onChange={(pitchDegrees) => onChange({ ...phrase, pitchDegrees })} />
+          <VariationField label="Yaw degrees" value={phrase.yawDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(yawDegrees) => onChange({ ...phrase, yawDegrees })} />
+          <VariationField label="Roll degrees" value={phrase.rollDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(rollDegrees) => onChange({ ...phrase, rollDegrees })} />
         </>
       ) : null}
       {phrase.type === "fork" ? (
         <>
           <VariationField label="Count" value={phrase.count} integer onChange={(count) => onChange({ ...phrase, count: count as CountVariation })} />
           <SelectField label="Layout" value={phrase.layout} options={["radial", "spiral", "mirrored", "cluster", "sameAxis"].map((value) => ({ value, label: value }))} onChange={(layout) => onChange({ ...phrase, layout: layout as ForkPhrase["layout"] })} />
-          <VariationField label="Spread degrees" value={phrase.spreadDegrees} onChange={(spreadDegrees) => onChange({ ...phrase, spreadDegrees })} />
-          <VariationField label="Radius" value={phrase.radius} onChange={(radius) => onChange({ ...phrase, radius })} />
+          <VariationField label="Spread degrees" value={phrase.spreadDegrees} step={1} min={0} max={360} deviationMax={360} onChange={(spreadDegrees) => onChange({ ...phrase, spreadDegrees })} />
+          <VariationField label="Radius" value={phrase.radius} step={0.005} min={0} onChange={(radius) => onChange({ ...phrase, radius })} />
         </>
       ) : null}
       {phrase.type === "branch" ? (
         <>
           <VariationField label="Offshoot count" value={phrase.count} integer onChange={(count) => onChange({ ...phrase, count: count as CountVariation })} />
-          <SelectField label="Layout" value={phrase.layout} options={["alongPath", "radial", "alternating", "tip", "fromForm"].map((value) => ({ value, label: value }))} onChange={(layout) => onChange({ ...phrase, layout: layout as "alongPath" | "radial" | "alternating" | "tip" | "fromForm" })} />
+          <SelectField label="Layout" value={phrase.layout} options={["alongPath", "radial", "alternating", "tip", "fromForm"].map((value) => ({ value, label: value }))} onChange={(layout) => onChange({ ...phrase, layout: layout as BranchPhrase["layout"] })} />
+          <VariationField label="Deviation angle" value={phrase.deviationDegrees ?? { ideal: 55, deviation: 8 }} step={1} min={0} max={180} deviationMax={180} onChange={(deviationDegrees) => onChange({ ...phrase, deviationDegrees })} />
+          <VariationField label="Around axis" value={phrase.aroundAxisDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={0} max={360} deviationMax={360} onChange={(aroundAxisDegrees) => onChange({ ...phrase, aroundAxisDegrees })} />
         </>
       ) : null}
       {phrase.type === "form" ? (
@@ -568,10 +589,10 @@ function FormPhraseDraftFields({ phrase, materials, onChange }: { phrase: FormPh
     <>
       <SelectField label="Primitive" value={phrase.primitive} options={["stemSkin", "saddlePetal", "centerDisc", "leafBlade", "quadSlat", "seedFuzz", "importedMesh"].map((value) => ({ value, label: value }))} onChange={(primitive) => onChange({ ...phrase, primitive: primitive as FormPhrase["primitive"] })} />
       <SelectField label="Material" value={phrase.materialId} options={materials.map((value) => ({ value, label: value }))} onChange={(materialId) => onChange({ ...phrase, materialId })} />
-      <VariationField label="Length" value={phrase.length ?? { ideal: 0.08, deviation: 0.01 }} onChange={(length) => onChange({ ...phrase, length })} />
-      <VariationField label="Width" value={phrase.width ?? { ideal: 0.04, deviation: 0.01 }} onChange={(width) => onChange({ ...phrase, width })} />
-      <VariationField label="Cup" value={phrase.cup ?? { ideal: 0.2, deviation: 0.05 }} onChange={(cup) => onChange({ ...phrase, cup })} />
-      <VariationField label="Curl" value={phrase.curl ?? { ideal: 0.14, deviation: 0.04 }} onChange={(curl) => onChange({ ...phrase, curl })} />
+      <VariationField label="Length" value={phrase.length ?? { ideal: 0.08, deviation: 0.01 }} step={0.005} min={0} onChange={(length) => onChange({ ...phrase, length })} />
+      <VariationField label="Width" value={phrase.width ?? { ideal: 0.04, deviation: 0.01 }} step={0.005} min={0} onChange={(width) => onChange({ ...phrase, width })} />
+      <VariationField label="Cup" value={phrase.cup ?? { ideal: 0.2, deviation: 0.05 }} step={0.01} min={0} max={1} deviationMax={1} onChange={(cup) => onChange({ ...phrase, cup })} />
+      <VariationField label="Curl" value={phrase.curl ?? { ideal: 0.14, deviation: 0.04 }} step={0.01} min={0} max={1} deviationMax={1} onChange={(curl) => onChange({ ...phrase, curl })} />
     </>
   );
 }
@@ -593,13 +614,15 @@ function PhraseProperties({ phrase, materials, onChange, onAddAfter, onAddInside
       <div className="rounded-md bg-[var(--subtle-bg)] px-3 py-2 text-sm text-[var(--muted-text)]">{phraseHelp(phrase.type)}</div>
       <AddPhrasePalette materials={materials} title="Add after selected" onAdd={onAddAfter} />
       {canContainPhrases ? (
-        <AddPhrasePalette materials={materials} title={`Add inside ${phrase.type}`} onAdd={onAddInside} />
+        <AddPhrasePalette materials={materials} title={`Add inside ${phraseTypeLabel(phrase.type)}`} onAdd={onAddInside} />
       ) : null}
       {phrase.type === "continue" ? (
         <>
-          <VariationField label="Distance" value={phrase.distance} onChange={(distance) => onChange((current) => current.type === "continue" ? { ...current, distance } : current)} />
-          <VariationField label="Start radius" value={phrase.radiusStart ?? { ideal: 0.01, deviation: 0 }} onChange={(radiusStart) => onChange((current) => current.type === "continue" ? { ...current, radiusStart } : current)} />
-          <VariationField label="End radius" value={phrase.radiusEnd ?? { ideal: 0.006, deviation: 0 }} onChange={(radiusEnd) => onChange((current) => current.type === "continue" ? { ...current, radiusEnd } : current)} />
+          <VariationField label="Distance" value={phrase.distance} step={0.005} min={0} onChange={(distance) => onChange((current) => current.type === "continue" ? { ...current, distance } : current)} />
+          <VariationField label="Arc degrees" value={phrase.arcDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={0} max={180} deviationMax={180} onChange={(arcDegrees) => onChange((current) => current.type === "continue" ? { ...current, arcDegrees } : current)} />
+          <VariationField label="Arc direction" value={phrase.arcAzimuthDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={0} max={360} deviationMax={360} onChange={(arcAzimuthDegrees) => onChange((current) => current.type === "continue" ? { ...current, arcAzimuthDegrees } : current)} />
+          <VariationField label="Start radius" value={phrase.radiusStart ?? { ideal: 0.01, deviation: 0 }} step={0.001} min={0} onChange={(radiusStart) => onChange((current) => current.type === "continue" ? { ...current, radiusStart } : current)} />
+          <VariationField label="End radius" value={phrase.radiusEnd ?? { ideal: 0.006, deviation: 0 }} step={0.001} min={0} onChange={(radiusEnd) => onChange((current) => current.type === "continue" ? { ...current, radiusEnd } : current)} />
           <SelectField label="Form along path" value={phrase.formAlongPath ?? "none"} options={["none", "stemSkin", "blade"].map((value) => ({ value, label: value }))} onChange={(formAlongPath) => onChange((current) => current.type === "continue" ? { ...current, formAlongPath: formAlongPath as "none" | "stemSkin" | "blade" } : current)} />
         </>
       ) : null}
@@ -607,14 +630,16 @@ function PhraseProperties({ phrase, materials, onChange, onAddAfter, onAddInside
         <>
           <VariationField label="Count" value={phrase.count} integer onChange={(count) => onChange((current) => current.type === "fork" ? { ...current, count: count as CountVariation } : current)} />
           <SelectField label="Layout" value={phrase.layout} options={["radial", "spiral", "mirrored", "cluster", "sameAxis"].map((value) => ({ value, label: value }))} onChange={(layout) => onChange((current) => current.type === "fork" ? { ...current, layout: layout as ForkPhrase["layout"] } : current)} />
-          <VariationField label="Spread degrees" value={phrase.spreadDegrees} onChange={(spreadDegrees) => onChange((current) => current.type === "fork" ? { ...current, spreadDegrees } : current)} />
-          <VariationField label="Radius" value={phrase.radius} onChange={(radius) => onChange((current) => current.type === "fork" ? { ...current, radius } : current)} />
+          <VariationField label="Spread degrees" value={phrase.spreadDegrees} step={1} min={0} max={360} deviationMax={360} onChange={(spreadDegrees) => onChange((current) => current.type === "fork" ? { ...current, spreadDegrees } : current)} />
+          <VariationField label="Radius" value={phrase.radius} step={0.005} min={0} onChange={(radius) => onChange((current) => current.type === "fork" ? { ...current, radius } : current)} />
         </>
       ) : null}
       {phrase.type === "branch" ? (
         <>
           <VariationField label="Offshoot count" value={phrase.count} integer onChange={(count) => onChange((current) => current.type === "branch" ? { ...current, count: count as CountVariation } : current)} />
-          <SelectField label="Layout" value={phrase.layout} options={["alongPath", "radial", "alternating", "tip", "fromForm"].map((value) => ({ value, label: value }))} onChange={(layout) => onChange((current) => current.type === "branch" ? { ...current, layout: layout as "alongPath" | "radial" | "alternating" | "tip" | "fromForm" } : current)} />
+          <SelectField label="Layout" value={phrase.layout} options={["alongPath", "radial", "alternating", "tip", "fromForm"].map((value) => ({ value, label: value }))} onChange={(layout) => onChange((current) => current.type === "branch" ? { ...current, layout: layout as BranchPhrase["layout"] } : current)} />
+          <VariationField label="Deviation angle" value={phrase.deviationDegrees ?? { ideal: 55, deviation: 8 }} step={1} min={0} max={180} deviationMax={180} onChange={(deviationDegrees) => onChange((current) => current.type === "branch" ? { ...current, deviationDegrees } : current)} />
+          <VariationField label="Around axis" value={phrase.aroundAxisDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={0} max={360} deviationMax={360} onChange={(aroundAxisDegrees) => onChange((current) => current.type === "branch" ? { ...current, aroundAxisDegrees } : current)} />
         </>
       ) : null}
       {phrase.type === "form" ? (
@@ -622,9 +647,9 @@ function PhraseProperties({ phrase, materials, onChange, onAddAfter, onAddInside
       ) : null}
       {phrase.type === "steer" ? (
         <>
-          <VariationField label="Pitch degrees" value={phrase.pitchDegrees ?? { ideal: 0, deviation: 0 }} onChange={(pitchDegrees) => onChange((current) => current.type === "steer" ? { ...current, pitchDegrees } : current)} />
-          <VariationField label="Yaw degrees" value={phrase.yawDegrees ?? { ideal: 0, deviation: 0 }} onChange={(yawDegrees) => onChange((current) => current.type === "steer" ? { ...current, yawDegrees } : current)} />
-          <VariationField label="Roll degrees" value={phrase.rollDegrees ?? { ideal: 0, deviation: 0 }} onChange={(rollDegrees) => onChange((current) => current.type === "steer" ? { ...current, rollDegrees } : current)} />
+          <VariationField label="Pitch degrees" value={phrase.pitchDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-180} max={180} deviationMax={180} onChange={(pitchDegrees) => onChange((current) => current.type === "steer" ? { ...current, pitchDegrees } : current)} />
+          <VariationField label="Yaw degrees" value={phrase.yawDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(yawDegrees) => onChange((current) => current.type === "steer" ? { ...current, yawDegrees } : current)} />
+          <VariationField label="Roll degrees" value={phrase.rollDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(rollDegrees) => onChange((current) => current.type === "steer" ? { ...current, rollDegrees } : current)} />
         </>
       ) : null}
     </Stack>
@@ -636,10 +661,10 @@ function FormPhraseProperties({ phrase, materials, onChange }: { phrase: FormPhr
     <>
       <SelectField label="Primitive" value={phrase.primitive} options={["stemSkin", "saddlePetal", "centerDisc", "leafBlade", "quadSlat", "seedFuzz", "importedMesh"].map((value) => ({ value, label: value }))} onChange={(primitive) => onChange((current) => current.type === "form" ? { ...current, primitive: primitive as FormPhrase["primitive"] } : current)} />
       <SelectField label="Material" value={phrase.materialId} options={materials.map((value) => ({ value, label: value }))} onChange={(materialId) => onChange((current) => current.type === "form" ? { ...current, materialId } : current)} />
-      <VariationField label="Length" value={phrase.length ?? { ideal: 0.08, deviation: 0.01 }} onChange={(length) => onChange((current) => current.type === "form" ? { ...current, length } : current)} />
-      <VariationField label="Width" value={phrase.width ?? { ideal: 0.04, deviation: 0.01 }} onChange={(width) => onChange((current) => current.type === "form" ? { ...current, width } : current)} />
-      <VariationField label="Cup" value={phrase.cup ?? { ideal: 0.2, deviation: 0.05 }} onChange={(cup) => onChange((current) => current.type === "form" ? { ...current, cup } : current)} />
-      <VariationField label="Curl" value={phrase.curl ?? { ideal: 0.14, deviation: 0.04 }} onChange={(curl) => onChange((current) => current.type === "form" ? { ...current, curl } : current)} />
+      <VariationField label="Length" value={phrase.length ?? { ideal: 0.08, deviation: 0.01 }} step={0.005} min={0} onChange={(length) => onChange((current) => current.type === "form" ? { ...current, length } : current)} />
+      <VariationField label="Width" value={phrase.width ?? { ideal: 0.04, deviation: 0.01 }} step={0.005} min={0} onChange={(width) => onChange((current) => current.type === "form" ? { ...current, width } : current)} />
+      <VariationField label="Cup" value={phrase.cup ?? { ideal: 0.2, deviation: 0.05 }} step={0.01} min={0} max={1} deviationMax={1} onChange={(cup) => onChange((current) => current.type === "form" ? { ...current, cup } : current)} />
+      <VariationField label="Curl" value={phrase.curl ?? { ideal: 0.14, deviation: 0.04 }} step={0.01} min={0} max={1} deviationMax={1} onChange={(curl) => onChange((current) => current.type === "form" ? { ...current, curl } : current)} />
     </>
   );
 }
@@ -687,17 +712,38 @@ function MaterialEditor({ asset, onChange }: { asset: VegetationSpeciesAssetFile
   );
 }
 
-function VariationField({ label, value, integer, onChange }: { label: string; value: IdealVariation | CountVariation; integer?: boolean; onChange: (value: IdealVariation | CountVariation) => void }) {
-  const step = integer ? 1 : 0.001;
+function VariationField({
+  label,
+  value,
+  integer,
+  step: requestedStep,
+  min,
+  max,
+  deviationMax,
+  onChange,
+}: {
+  label: string;
+  value: IdealVariation | CountVariation;
+  integer?: boolean;
+  step?: number;
+  min?: number;
+  max?: number;
+  deviationMax?: number;
+  onChange: (value: IdealVariation | CountVariation) => void;
+}) {
+  const step = integer ? 1 : requestedStep ?? 0.01;
   const update = (patch: Partial<IdealVariation>) => {
     const next = { ...value, ...patch };
     onChange(integer ? clampCountVariation(next) : next);
   };
+  const idealMax = max;
+  const idealMin = integer ? 1 : min;
+  const deviationLimit = integer ? Math.max(0, value.ideal) : deviationMax;
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_6.25rem_6.25rem] items-end gap-1.5">
       <div className="text-xs font-bold text-[var(--muted-text)]">{label}</div>
-      <NumberField label="Ideal" value={value.ideal} step={step} min={integer ? 1 : undefined} onChange={(ideal) => update({ ideal })} />
-      <NumberField label="+/-" value={value.deviation} step={step} min={0} max={integer ? Math.max(0, value.ideal) : undefined} onChange={(deviation) => update({ deviation })} />
+      <NumberField label="Ideal" value={value.ideal} step={step} min={idealMin} max={idealMax} onChange={(ideal) => update({ ideal })} />
+      <NumberField label="+/-" value={value.deviation} step={step} min={0} max={deviationLimit} onChange={(deviation) => update({ deviation })} />
     </div>
   );
 }
@@ -734,10 +780,13 @@ function NumberField({ label, value, step, min, max, onChange }: { label: string
     onChange(next);
   };
   const holdRate = (elapsed: number) => {
-    if (elapsed < 360) return 0;
-    const active = elapsed - 360;
-    if (step >= 1) return Math.min(18, 4.5 + active / 180);
-    return Math.min(54, 12 + active / 70);
+    if (elapsed < 220) return 0;
+    const active = elapsed - 220;
+    const ramp = Math.min(1, active / 1100);
+    if (step >= 1) return 10 + (ramp * 42);
+    if (step >= 0.01) return 18 + (ramp * 96);
+    if (step >= 0.005) return 24 + (ramp * 132);
+    return 34 + (ramp * 210);
   };
   const tickHold = (now: number) => {
     const hold = holdRef.current;
@@ -894,11 +943,11 @@ function ColorField({ label, value, onChange }: { label: string; value: ColorHex
 }
 
 function phraseHelp(type: GrowthPhrase["type"]) {
-  if (type === "continue") return "The current growth cursor advances and stays the same logical thought.";
+  if (type === "continue") return "The plant grows forward along the current direction. Arc bends that growth smoothly as it extends.";
   if (type === "fork") return "The cursor splits into multiple alike continuations, such as petals in a whorl.";
-  if (type === "branch") return "The main cursor keeps going while leaving a different offshoot behind.";
+  if (type === "branch") return "The main growth keeps going while leaving a different offshoot at a deviation angle and around-axis direction.";
   if (type === "form") return "Actual geometry is formed at the cursor: petal, leaf, center, slat, or mesh.";
-  if (type === "steer") return "The cursor changes direction, tilt, roll, or scale before the next phrase.";
+  if (type === "steer") return "The growth axis turns before the next phrase.";
   if (type === "color") return "The material context changes for following forms.";
   return "One of several phrase paths is chosen during generation.";
 }
@@ -1065,7 +1114,17 @@ function removePhrase(phrases: GrowthPhrase[], id: string): GrowthPhrase[] {
 }
 
 function makeContinuePhrase(): GrowthPhrase {
-  return { id: uniqueId("continue"), type: "continue", label: "Continue growth", distance: { ideal: 0.08, deviation: 0.015 }, formAlongPath: "none" };
+  return {
+    id: uniqueId("grow"),
+    type: "continue",
+    label: "Grow forward",
+    distance: { ideal: 0.12, deviation: 0.025 },
+    radiusStart: { ideal: 0.012, deviation: 0.002 },
+    radiusEnd: { ideal: 0.007, deviation: 0.001 },
+    arcDegrees: { ideal: 4, deviation: 2 },
+    arcAzimuthDegrees: { ideal: 0, deviation: 0 },
+    formAlongPath: "stemSkin",
+  };
 }
 
 function makeForkPhrase(): GrowthPhrase {
@@ -1073,11 +1132,11 @@ function makeForkPhrase(): GrowthPhrase {
 }
 
 function makeBranchPhrase(): GrowthPhrase {
-  return { id: uniqueId("branch"), type: "branch", label: "Branch offshoot", count: { ideal: 1, deviation: 0 }, layout: "tip", offshoot: [makeFormPhrase()] };
+  return { id: uniqueId("branch"), type: "branch", label: "Branch offshoot", count: { ideal: 1, deviation: 0 }, layout: "tip", deviationDegrees: { ideal: 55, deviation: 8 }, aroundAxisDegrees: { ideal: 0, deviation: 0 }, offshoot: [makeFormPhrase()] };
 }
 
 function makeSteerPhrase(): GrowthPhrase {
-  return { id: uniqueId("steer"), type: "steer", label: "Steer cursor", pitchDegrees: { ideal: 0, deviation: 0 }, yawDegrees: { ideal: 0, deviation: 0 }, rollDegrees: { ideal: 0, deviation: 0 } };
+  return { id: uniqueId("turn"), type: "steer", label: "Turn growth axis", pitchDegrees: { ideal: 0, deviation: 0 }, yawDegrees: { ideal: 0, deviation: 0 }, rollDegrees: { ideal: 0, deviation: 0 } };
 }
 
 function makeFormPhrase(): GrowthPhrase {
@@ -1152,6 +1211,8 @@ function makeCloverAsset(): VegetationSpeciesAssetFile {
           type: "continue",
           label: "Lift from ground",
           distance: { ideal: 0.018, deviation: 0.008 },
+          arcDegrees: { ideal: 0, deviation: 0 },
+          arcAzimuthDegrees: { ideal: 0, deviation: 0 },
           formAlongPath: "none",
         },
         {
@@ -1239,6 +1300,8 @@ function makeTulipAsset(): VegetationSpeciesAssetFile {
           label: "Branch leaves from stem",
           count: { ideal: 2, deviation: 1 },
           layout: "alongPath",
+          deviationDegrees: { ideal: 62, deviation: 10 },
+          aroundAxisDegrees: { ideal: 35, deviation: 25 },
           offshoot: [{
             id: "tulip-leaf",
             type: "form",

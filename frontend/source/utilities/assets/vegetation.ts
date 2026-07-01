@@ -127,6 +127,8 @@ export type ContinuePhrase = GrowthPhraseBase & {
   radiusStart?: IdealVariation;
   radiusEnd?: IdealVariation;
   bend?: IdealVariation;
+  arcDegrees?: IdealVariation;
+  arcAzimuthDegrees?: IdealVariation;
   formAlongPath?: "none" | "stemSkin" | "blade";
 };
 
@@ -144,6 +146,8 @@ export type BranchPhrase = GrowthPhraseBase & {
   count: CountVariation;
   layout: "alongPath" | "radial" | "alternating" | "tip" | "fromForm";
   sideBiasDegrees?: IdealVariation;
+  deviationDegrees?: IdealVariation;
+  aroundAxisDegrees?: IdealVariation;
   offshoot: GrowthPhrase[];
 };
 
@@ -239,6 +243,8 @@ export const defaultVegetationAsset: VegetationSpeciesAssetFile = {
           radiusStart: { ideal: 0.016, deviation: 0.003 },
           radiusEnd: { ideal: 0.009, deviation: 0.002 },
           bend: { ideal: 0.08, deviation: 0.04 },
+          arcDegrees: { ideal: 5, deviation: 3 },
+          arcAzimuthDegrees: { ideal: 0, deviation: 0 },
           formAlongPath: "stemSkin",
         },
         {
@@ -373,6 +379,8 @@ export function fieldFlowerShapeToRecipe(shape: FieldFlowerShapeDefinition, peta
         radiusStart: rangeToIdeal(shape.stemRadius),
         radiusEnd: { ideal: rangeToIdeal(shape.stemRadius).ideal * 0.62, deviation: rangeToIdeal(shape.stemRadius).deviation * 0.62 },
         bend: { ideal: 0.08, deviation: 0.04 },
+        arcDegrees: { ideal: 5, deviation: 3 },
+        arcAzimuthDegrees: { ideal: 0, deviation: 0 },
         formAlongPath: "stemSkin",
       },
       {
@@ -472,9 +480,9 @@ function flattenPhrases(phrases: GrowthPhrase[]): GrowthPhrase[] {
 }
 
 function collectPhraseVariations(phrase: GrowthPhrase): (IdealVariation | CountVariation)[] {
-  if (phrase.type === "continue") return [phrase.distance, ...(phrase.radiusStart ? [phrase.radiusStart] : []), ...(phrase.radiusEnd ? [phrase.radiusEnd] : []), ...(phrase.bend ? [phrase.bend] : [])];
+  if (phrase.type === "continue") return [phrase.distance, ...(phrase.radiusStart ? [phrase.radiusStart] : []), ...(phrase.radiusEnd ? [phrase.radiusEnd] : []), ...(phrase.bend ? [phrase.bend] : []), ...(phrase.arcDegrees ? [phrase.arcDegrees] : []), ...(phrase.arcAzimuthDegrees ? [phrase.arcAzimuthDegrees] : [])];
   if (phrase.type === "fork") return [phrase.count, phrase.spreadDegrees, phrase.radius];
-  if (phrase.type === "branch") return [phrase.count, ...(phrase.sideBiasDegrees ? [phrase.sideBiasDegrees] : [])];
+  if (phrase.type === "branch") return [phrase.count, ...(phrase.sideBiasDegrees ? [phrase.sideBiasDegrees] : []), ...(phrase.deviationDegrees ? [phrase.deviationDegrees] : []), ...(phrase.aroundAxisDegrees ? [phrase.aroundAxisDegrees] : [])];
   if (phrase.type === "steer") return [...(phrase.yawDegrees ? [phrase.yawDegrees] : []), ...(phrase.pitchDegrees ? [phrase.pitchDegrees] : []), ...(phrase.rollDegrees ? [phrase.rollDegrees] : []), ...(phrase.scale ? [phrase.scale] : [])];
   if (phrase.type === "form") return [...(phrase.length ? [phrase.length] : []), ...(phrase.width ? [phrase.width] : []), ...(phrase.cup ? [phrase.cup] : []), ...(phrase.curl ? [phrase.curl] : [])];
   return [];
@@ -531,5 +539,5 @@ function idealToRange(value: IdealVariation): RangeF {
 }
 
 function idealToRangeI(value: CountVariation): RangeI {
-  return { min: Math.max(0, Math.round(value.ideal - value.deviation)), max: Math.max(0, Math.round(value.ideal + value.deviation)) };
+  return { min: Math.max(1, Math.round(value.ideal - value.deviation)), max: Math.max(1, Math.round(value.ideal + value.deviation)) };
 }

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArcRotateCamera, Color3, Color4, DynamicTexture, Effect, Engine, HemisphericLight, Matrix, Mesh, MeshBuilder, Scene, ShaderMaterial, StandardMaterial, TransformNode, Vector3, VertexData, Viewport } from "@babylonjs/core";
+import { ArcRotateCamera, Color3, Color4, DynamicTexture, Effect, Engine, HemisphericLight, Matrix, Mesh, MeshBuilder, Quaternion, Scene, ShaderMaterial, StandardMaterial, TransformNode, Vector3, VertexData, Viewport } from "@babylonjs/core";
 import { Asterisk, CircleDot, Crosshair, Flower, Flower2, GalleryHorizontal, Grid2x2, Grid3x3, LayoutGrid, Leaf, PanelRight } from "lucide-react";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "../Components/Base";
-import { recipeToFieldFlowerShape, type FieldFlowerShapeDefinition, type FormPhrase, type ForkPhrase, type GrassLodSettings, type GrowthPhrase, type VegetationSpeciesAssetFile } from "../utilities/assets/vegetation";
+import { recipeToFieldFlowerShape, type BranchPhrase, type FieldFlowerShapeDefinition, type FormPhrase, type ForkPhrase, type GrassLodSettings, type GrowthPhrase, type VegetationSpeciesAssetFile } from "../utilities/assets/vegetation";
 
 type Props = {
   asset: VegetationSpeciesAssetFile;
@@ -16,6 +16,19 @@ type RecipeFlowerPreview = {
   hasStem: boolean;
   hasPetals: boolean;
   hasCenter: boolean;
+  stemArcDegrees: number;
+  stemArcAzimuthDegrees: number;
+  leaf?: RecipeLeafPreview;
+};
+type RecipeLeafPreview = {
+  count: number;
+  length: number;
+  width: number;
+  curl: number;
+  deviationDegrees: number;
+  aroundAxisDegrees: number;
+  layout: BranchPhrase["layout"];
+  materialId: string;
 };
 type CloverShape = Extract<VegetationSpeciesAssetFile["species"]["parts"][0]["shape"], { type: "cloverCluster" }>;
 type TallFlowerShape = Extract<VegetationSpeciesAssetFile["species"]["parts"][0]["shape"], { type: "tallFlower" }>;
@@ -41,17 +54,22 @@ type FieldFlowerCloseupHandle = {
   center: Mesh;
   petalSource: Mesh;
   petals: Mesh[];
+  leafSource: Mesh;
+  leaves: Mesh[];
   stemMaterial: StandardMaterial;
   centerMaterial: StandardMaterial;
   petalMaterial: StandardMaterial;
+  leafMaterial: StandardMaterial;
 };
 type FieldFlowerPopulationHandle = {
   stem: Mesh;
   center: Mesh;
   petal: Mesh;
+  leaf: Mesh;
   stemMaterial: StandardMaterial;
   centerMaterial: StandardMaterial;
   petalMaterial: StandardMaterial;
+  leafMaterial: StandardMaterial;
 };
 type FieldFlowerSlatHandle = {
   markers: Mesh[];
@@ -157,11 +175,11 @@ export function VegetationBabylonPreview({ asset, grass, mode, focusPhraseId }: 
     updateCameraTargets(runtime.cameras, asset, mode, focusPhraseId, closeupView, closeupZoom);
   }, [asset, mode, focusPhraseId, closeupView, closeupZoom]);
 
-  if (mode) return <canvas ref={canvasRef} className="h-full min-h-0 w-full touch-none rounded-md bg-[#dfead8]" />;
+  if (mode) return <canvas ref={canvasRef} data-testid={`vegetation-preview-${mode}`} className="h-full min-h-0 w-full touch-none rounded-md bg-[#dfead8]" />;
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden rounded-md bg-[#dfead8]">
-      <canvas ref={canvasRef} className="h-full min-h-0 w-full touch-none" />
+      <canvas ref={canvasRef} data-testid="vegetation-preview-board" className="h-full min-h-0 w-full touch-none" />
       <PreviewPaneChrome
         className="left-2 top-2"
         icon={renderPaneIcon(closeupIconRole, paneIcons[closeupIconRole])}
@@ -306,10 +324,11 @@ function updateFieldFlowerBoard(
   const fieldBoard = runtime.fieldBoard!;
   const petalMaterialId = getPetalMaterialId(asset);
   const petalColor = asset.species.materials[petalMaterialId]?.baseColor ?? "#a8c7fa";
+  const leafColor = preview?.leaf ? asset.species.materials[preview.leaf.materialId]?.baseColor ?? "#4c9a4b" : "#4c9a4b";
 
-  updateFieldFlowerCloseup(fieldBoard.closeup, preview, petalColor);
-  updateFieldFlowerPopulation(fieldBoard.population50, preview, petalColor, 0.5, 500);
-  updateFieldFlowerPopulation(fieldBoard.population100, preview, petalColor, 1, 1000);
+  updateFieldFlowerCloseup(fieldBoard.closeup, preview, petalColor, leafColor);
+  updateFieldFlowerPopulation(fieldBoard.population50, preview, petalColor, leafColor, 0.5, 500);
+  updateFieldFlowerPopulation(fieldBoard.population100, preview, petalColor, leafColor, 1, 1000);
   updateFieldFlowerSlatPreview(fieldBoard.slats50, preview, petalColor, { ...grass, density: 0.5 }, 90);
   updateFieldFlowerSlatPreview(fieldBoard.slats100, preview, petalColor, { ...grass, density: 1 }, 170);
   updateCameraTargets(fieldBoard.cameras, asset, undefined, focusPhraseId, closeupView, closeupZoom);
@@ -322,6 +341,7 @@ function disposeFieldFlowerBoard(runtime: PreviewRuntime) {
 }
 
 const maxCloseupPetals = 36;
+const maxCloseupLeaves = 16;
 const maxSlatMarkers = 180;
 
 function createFieldFlowerCloseup(scene: Scene, parent: TransformNode, initialShape: FieldFlowerShapeDefinition): FieldFlowerCloseupHandle {
@@ -333,7 +353,9 @@ function createFieldFlowerCloseup(scene: Scene, parent: TransformNode, initialSh
   const stemMaterial = material(scene, "field-live-closeup-stem-mat", "#486d2f");
   const centerMaterial = material(scene, "field-live-closeup-center-mat", "#f0c75e");
   const petalMaterial = material(scene, "field-live-closeup-petal-mat", "#a8c7fa");
+  const leafMaterial = material(scene, "field-live-closeup-leaf-mat", "#4c9a4b");
   petalMaterial.backFaceCulling = false;
+  leafMaterial.backFaceCulling = false;
 
   const stem = MeshBuilder.CreateCylinder("field-live-closeup-stem", { height: 1, diameter: 1, tessellation: 6 }, scene);
   stem.bakeTransformIntoVertices(Matrix.Translation(0, 0.5, 0));
@@ -357,10 +379,23 @@ function createFieldFlowerCloseup(scene: Scene, parent: TransformNode, initialSh
     return petal;
   });
 
-  return { root, stem, center, petalSource, petals, stemMaterial, centerMaterial, petalMaterial };
+  const leafSource = MeshBuilder.CreatePlane("field-live-closeup-leaf-source", { width: 1, height: 1 }, scene);
+  leafSource.bakeTransformIntoVertices(Matrix.Translation(0, 0.5, 0));
+  leafSource.material = leafMaterial;
+  leafSource.parent = root;
+  leafSource.setEnabled(false);
+
+  const leaves = Array.from({ length: maxCloseupLeaves }, (_, index) => {
+    const leaf = leafSource.clone(`field-live-closeup-leaf-${index}`)!;
+    leaf.parent = root;
+    leaf.setEnabled(false);
+    return leaf;
+  });
+
+  return { root, stem, center, petalSource, petals, leafSource, leaves, stemMaterial, centerMaterial, petalMaterial, leafMaterial };
 }
 
-function updateFieldFlowerCloseup(handle: FieldFlowerCloseupHandle, preview: RecipeFlowerPreview | undefined, petalColor: string) {
+function updateFieldFlowerCloseup(handle: FieldFlowerCloseupHandle, preview: RecipeFlowerPreview | undefined, petalColor: string, leafColor: string) {
   handle.root.setEnabled(Boolean(preview));
   if (!preview) return;
 
@@ -371,17 +406,20 @@ function updateFieldFlowerCloseup(handle: FieldFlowerCloseupHandle, preview: Rec
   const stemHeight = midpoint(shape.stemHeight);
   const stemRadius = midpoint(shape.stemRadius);
   const centerRadius = midpoint(shape.centerRadius);
+  const stemVector = stemGrowthVector(stemHeight, preview.stemArcDegrees, preview.stemArcAzimuthDegrees);
 
   setMaterialColor(handle.petalMaterial, petalColor);
+  setMaterialColor(handle.leafMaterial, leafColor);
   setMaterialColor(handle.stemMaterial, "#486d2f");
   setMaterialColor(handle.centerMaterial, "#f0c75e");
   applySaddlePetalGeometry(handle.petalSource, shape);
 
   handle.stem.setEnabled(preview.hasStem);
   handle.stem.scaling.set(stemRadius, stemHeight, stemRadius);
+  orientAlongVector(handle.stem, stemVector);
   handle.center.setEnabled(preview.hasCenter);
   handle.center.scaling.set(centerRadius, centerRadius * 0.62, centerRadius);
-  handle.center.position.y = stemHeight;
+  handle.center.position.copyFrom(stemVector);
 
   for (let index = 0; index < handle.petals.length; index += 1) {
     const petal = handle.petals[index];
@@ -390,8 +428,23 @@ function updateFieldFlowerCloseup(handle: FieldFlowerCloseupHandle, preview: Rec
     if (!enabled) continue;
     const theta = (index / petalCount) * Math.PI * 2;
     petal.scaling.set(petalWidth, petalLength, petalLength);
-    petal.position.set(0, stemHeight, centerRadius * 0.55);
+    petal.position.set(stemVector.x, stemVector.y, stemVector.z + (centerRadius * 0.55));
     petal.rotation.set(-0.72, theta, 0);
+  }
+
+  const leaf = preview.leaf;
+  const leafCount = leaf ? Math.max(1, Math.min(maxCloseupLeaves, Math.round(leaf.count))) : 0;
+  for (let index = 0; index < handle.leaves.length; index += 1) {
+    const leafMesh = handle.leaves[index];
+    const enabled = index < leafCount;
+    leafMesh.setEnabled(enabled);
+    if (!enabled || !leaf) continue;
+    const theta = branchTheta(leaf, index, leafCount);
+    const y = branchStemPosition(leaf, index, leafCount, stemHeight);
+    const t = stemHeight > 0 ? y / stemHeight : 0;
+    leafMesh.position.set(stemVector.x * t, stemVector.y * t, stemVector.z * t);
+    leafMesh.scaling.set(leaf.width, leaf.length, 1);
+    leafMesh.rotation.set(0, theta, -degreesToRadians(leaf.deviationDegrees));
   }
 }
 
@@ -399,7 +452,9 @@ function createFieldFlowerPopulation(scene: Scene, parent: TransformNode, name: 
   const stemMaterial = material(scene, `${name}-live-stem-mat`, "#486d2f");
   const centerMaterial = material(scene, `${name}-live-center-mat`, "#f0c75e");
   const petalMaterial = material(scene, `${name}-live-petal-mat`, "#a8c7fa");
+  const leafMaterial = material(scene, `${name}-live-leaf-mat`, "#4c9a4b");
   petalMaterial.backFaceCulling = false;
+  leafMaterial.backFaceCulling = false;
 
   const stem = MeshBuilder.CreateCylinder(`${name}-live-stem-source`, { height: 1, diameter: 1, tessellation: 5 }, scene);
   stem.bakeTransformIntoVertices(Matrix.Translation(0, 0.5, 0));
@@ -414,13 +469,19 @@ function createFieldFlowerPopulation(scene: Scene, parent: TransformNode, name: 
   petal.material = petalMaterial;
   petal.parent = parent;
 
-  return { stem, center, petal, stemMaterial, centerMaterial, petalMaterial };
+  const leaf = MeshBuilder.CreatePlane(`${name}-live-leaf-source`, { width: 1, height: 1 }, scene);
+  leaf.bakeTransformIntoVertices(Matrix.Translation(0, 0.5, 0));
+  leaf.material = leafMaterial;
+  leaf.parent = parent;
+
+  return { stem, center, petal, leaf, stemMaterial, centerMaterial, petalMaterial, leafMaterial };
 }
 
-function updateFieldFlowerPopulation(handle: FieldFlowerPopulationHandle, preview: RecipeFlowerPreview | undefined, petalColor: string, density: number, count: number) {
+function updateFieldFlowerPopulation(handle: FieldFlowerPopulationHandle, preview: RecipeFlowerPreview | undefined, petalColor: string, leafColor: string, density: number, count: number) {
   handle.stem.setEnabled(Boolean(preview?.hasStem));
   handle.center.setEnabled(Boolean(preview?.hasCenter));
   handle.petal.setEnabled(Boolean(preview?.hasPetals));
+  handle.leaf.setEnabled(Boolean(preview?.leaf));
   if (!preview) return;
 
   const shape = preview.shape;
@@ -432,8 +493,10 @@ function updateFieldFlowerPopulation(handle: FieldFlowerPopulationHandle, previe
   const stemHeight = midpoint(shape.stemHeight) * plantScale;
   const stemRadius = midpoint(shape.stemRadius) * plantScale;
   const centerRadius = midpoint(shape.centerRadius) * plantScale;
+  const stemVector = stemGrowthVector(stemHeight, preview.stemArcDegrees, preview.stemArcAzimuthDegrees);
 
   setMaterialColor(handle.petalMaterial, petalColor);
+  setMaterialColor(handle.leafMaterial, leafColor);
   setMaterialColor(handle.stemMaterial, "#486d2f");
   setMaterialColor(handle.centerMaterial, "#f0c75e");
   applySaddlePetalGeometry(handle.petal, shape);
@@ -441,7 +504,10 @@ function updateFieldFlowerPopulation(handle: FieldFlowerPopulationHandle, previe
   const stemMatrices = new Float32Array(preview.hasStem ? count * 16 : 0);
   const centerMatrices = new Float32Array(preview.hasCenter ? count * 16 : 0);
   const petalMatrices = new Float32Array(preview.hasPetals ? count * petalCount * 16 : 0);
+  const leafCount = preview.leaf ? Math.max(1, Math.min(maxCloseupLeaves, Math.round(preview.leaf.count))) : 0;
+  const leafMatrices = new Float32Array(preview.leaf ? count * leafCount * 16 : 0);
   let petalCursor = 0;
+  let leafCursor = 0;
 
   for (let index = 0; index < count; index += 1) {
     const angle = hash(index, 31) * Math.PI * 2;
@@ -452,10 +518,11 @@ function updateFieldFlowerPopulation(handle: FieldFlowerPopulationHandle, previe
     const scale = 0.75 + (hash(index, 34) * 0.5);
     const world = Matrix.Translation(x, 0, z);
     const facing = Matrix.RotationY(yaw);
-    const headLift = Matrix.Translation(0, stemHeight * scale, 0);
+    const headLift = Matrix.Translation(stemVector.x * scale, stemVector.y * scale, stemVector.z * scale);
 
     if (preview.hasStem) {
       Matrix.Scaling(stemRadius * scale, stemHeight * scale, stemRadius * scale)
+        .multiply(stemOrientationMatrix(stemVector))
         .multiply(world)
         .copyToArray(stemMatrices, index * 16);
     }
@@ -480,6 +547,19 @@ function updateFieldFlowerPopulation(handle: FieldFlowerPopulationHandle, previe
         .copyToArray(petalMatrices, petalCursor * 16);
       petalCursor += 1;
     }
+
+    for (let leafIndex = 0; preview.leaf && leafIndex < leafCount; leafIndex += 1) {
+      const theta = branchTheta(preview.leaf, leafIndex, leafCount) + yaw;
+      const leafY = branchStemPosition(preview.leaf, leafIndex, leafCount, stemHeight) * scale;
+      const t = stemHeight > 0 ? leafY / (stemHeight * scale) : 0;
+      const stemPoint = rotateYVector(stemVector.x * scale * t, stemVector.y * scale * t, stemVector.z * scale * t, yaw);
+      Matrix.Scaling(preview.leaf.width * plantScale * scale, preview.leaf.length * plantScale * scale, 1)
+        .multiply(Matrix.RotationZ(-degreesToRadians(preview.leaf.deviationDegrees)))
+        .multiply(Matrix.RotationY(theta))
+        .multiply(Matrix.Translation(x + stemPoint.x, stemPoint.y, z + stemPoint.z))
+        .copyToArray(leafMatrices, leafCursor * 16);
+      leafCursor += 1;
+    }
   }
 
   if (preview.hasStem) {
@@ -493,6 +573,10 @@ function updateFieldFlowerPopulation(handle: FieldFlowerPopulationHandle, previe
   if (preview.hasPetals) {
     handle.petal.thinInstanceSetBuffer("matrix", petalMatrices, 16);
     handle.petal.thinInstanceRefreshBoundingInfo();
+  }
+  if (preview.leaf) {
+    handle.leaf.thinInstanceSetBuffer("matrix", leafMatrices, 16);
+    handle.leaf.thinInstanceRefreshBoundingInfo();
   }
 }
 
@@ -532,6 +616,55 @@ function updateFieldFlowerSlatPreview(handle: FieldFlowerSlatHandle, preview: Re
     handle.slatMesh.material = nextMaterial;
     handle.slatMaterial = nextMaterial;
   }
+}
+
+function stemGrowthVector(height: number, arcDegrees: number, arcAzimuthDegrees: number) {
+  const arc = degreesToRadians(Math.max(0, Math.min(180, arcDegrees)));
+  const azimuth = degreesToRadians(arcAzimuthDegrees);
+  const radial = Math.sin(arc) * height;
+  return new Vector3(Math.cos(azimuth) * radial, Math.cos(arc) * height, Math.sin(azimuth) * radial);
+}
+
+function stemOrientationMatrix(vector: Vector3) {
+  const direction = vector.lengthSquared() > 0.000001 ? vector.normalizeToNew() : new Vector3(0, 1, 0);
+  const rotation = new Quaternion();
+  Quaternion.FromUnitVectorsToRef(new Vector3(0, 1, 0), direction, rotation);
+  const matrix = Matrix.Identity();
+  Matrix.FromQuaternionToRef(rotation, matrix);
+  return matrix;
+}
+
+function orientAlongVector(mesh: Mesh, vector: Vector3) {
+  const direction = vector.lengthSquared() > 0.000001 ? vector.normalizeToNew() : new Vector3(0, 1, 0);
+  mesh.rotationQuaternion ??= new Quaternion();
+  Quaternion.FromUnitVectorsToRef(new Vector3(0, 1, 0), direction, mesh.rotationQuaternion);
+}
+
+function rotateYVector(x: number, y: number, z: number, yaw: number) {
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  return new Vector3((x * cos) + (z * sin), y, (z * cos) - (x * sin));
+}
+
+function branchTheta(leaf: RecipeLeafPreview, index: number, count: number) {
+  const base = degreesToRadians(leaf.aroundAxisDegrees);
+  if (leaf.layout === "alongPath") return base + ((index % 2) * Math.PI);
+  if (leaf.layout === "alternating") return base + (index * Math.PI);
+  if (leaf.layout === "radial") return base + ((index / Math.max(1, count)) * Math.PI * 2);
+  return base;
+}
+
+function branchStemPosition(leaf: RecipeLeafPreview, index: number, count: number, stemHeight: number) {
+  if (leaf.layout === "tip") return stemHeight;
+  if (leaf.layout === "alongPath" || leaf.layout === "alternating") {
+    const t = (index + 1) / (count + 1);
+    return stemHeight * (0.18 + (t * 0.62));
+  }
+  return stemHeight * 0.82;
+}
+
+function degreesToRadians(value: number) {
+  return (value * Math.PI) / 180;
 }
 
 function setMaterialColor(mat: StandardMaterial, color: string) {
@@ -812,13 +945,80 @@ function getRenderableFlowerPreview(asset: VegetationSpeciesAssetFile): RecipeFl
   const sourceShape = asset.species.parts[0].shape;
   if (sourceShape.type !== "fieldFlower") return undefined;
   const recipe = asset.species.constructionRecipe;
-  if (!recipe) return { shape: sourceShape, hasStem: true, hasPetals: true, hasCenter: true };
+  if (!recipe) return { shape: sourceShape, hasStem: true, hasPetals: true, hasCenter: true, stemArcDegrees: 0, stemArcAzimuthDegrees: 0 };
   const phrases = flattenPhrases(recipe.root);
-  const hasStem = phrases.some((phrase) => phrase.type === "continue" && phrase.formAlongPath === "stemSkin");
+  const stemGrowth = phrases.find((phrase): phrase is Extract<GrowthPhrase, { type: "continue" }> => phrase.type === "continue" && phrase.formAlongPath === "stemSkin");
+  const hasStem = Boolean(stemGrowth) || phrases.some((phrase) => phrase.type === "form" && phrase.primitive === "stemSkin");
   const hasPetals = phrases.some(isSaddlePetalForm);
   const hasCenter = phrases.some((phrase) => phrase.type === "form" && phrase.primitive === "centerDisc");
-  if (!hasStem && !hasPetals && !hasCenter) return undefined;
-  return { shape: recipeToFieldFlowerShape(recipe, sourceShape), hasStem, hasPetals, hasCenter };
+  const leaf = getRecipeLeafPreview(recipe.root);
+  if (!hasStem && !hasPetals && !hasCenter && !leaf) return undefined;
+  return {
+    shape: recipeToFieldFlowerShape(recipe, sourceShape),
+    hasStem,
+    hasPetals,
+    hasCenter,
+    stemArcDegrees: stemGrowth?.arcDegrees?.ideal ?? 0,
+    stemArcAzimuthDegrees: stemGrowth?.arcAzimuthDegrees?.ideal ?? 0,
+    leaf,
+  };
+}
+
+function getRecipeLeafPreview(root: GrowthPhrase[]): RecipeLeafPreview | undefined {
+  for (const phrase of root) {
+    if (phrase.type === "branch") {
+      const leaf = getFirstLeafForm(phrase.offshoot);
+      if (leaf) return makeRecipeLeafPreview(leaf, phrase);
+      const nested = getRecipeLeafPreview(phrase.offshoot);
+      if (nested) return nested;
+    }
+    if (phrase.type === "fork") {
+      const nested = getRecipeLeafPreview(phrase.continuation);
+      if (nested) return nested;
+    }
+    if (phrase.type === "choose") {
+      for (const option of phrase.options) {
+        const nested = getRecipeLeafPreview(option.phrase);
+        if (nested) return nested;
+      }
+    }
+    if (phrase.type === "form" && phrase.primitive === "leafBlade") return makeRecipeLeafPreview(phrase);
+  }
+  return undefined;
+}
+
+function getFirstLeafForm(phrases: GrowthPhrase[]): FormPhrase | undefined {
+  for (const phrase of phrases) {
+    if (phrase.type === "form" && phrase.primitive === "leafBlade") return phrase;
+    if (phrase.type === "fork") {
+      const found = getFirstLeafForm(phrase.continuation);
+      if (found) return found;
+    }
+    if (phrase.type === "branch") {
+      const found = getFirstLeafForm(phrase.offshoot);
+      if (found) return found;
+    }
+    if (phrase.type === "choose") {
+      for (const option of phrase.options) {
+        const found = getFirstLeafForm(option.phrase);
+        if (found) return found;
+      }
+    }
+  }
+  return undefined;
+}
+
+function makeRecipeLeafPreview(leaf: FormPhrase, branch?: BranchPhrase): RecipeLeafPreview {
+  return {
+    count: branch ? branch.count.ideal : 1,
+    length: leaf.length?.ideal ?? 0.09,
+    width: leaf.width?.ideal ?? 0.035,
+    curl: leaf.curl?.ideal ?? 0,
+    deviationDegrees: branch?.deviationDegrees?.ideal ?? 55,
+    aroundAxisDegrees: branch?.aroundAxisDegrees?.ideal ?? branch?.sideBiasDegrees?.ideal ?? 0,
+    layout: branch?.layout ?? "tip",
+    materialId: leaf.materialId,
+  };
 }
 
 function getPetalMaterialId(asset: VegetationSpeciesAssetFile) {
