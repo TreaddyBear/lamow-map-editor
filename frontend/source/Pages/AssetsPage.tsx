@@ -199,7 +199,7 @@ export function AssetsPage({ onOpenMapEditor }: Props) {
   };
 
   return (
-    <main className="grid h-screen max-h-screen gap-4 overflow-hidden p-4 [grid-template-rows:auto_minmax(0,1fr)] [grid-template-columns:minmax(340px,410px)_minmax(0,1fr)_minmax(360px,430px)] max-[1180px]:[grid-template-rows:auto_minmax(0,1fr)_minmax(280px,42vh)] max-[1180px]:[grid-template-columns:minmax(320px,390px)_minmax(0,1fr)] max-[820px]:h-auto max-[820px]:max-h-none max-[820px]:overflow-auto max-[820px]:[grid-template-columns:1fr] max-[820px]:[grid-template-rows:auto_auto_auto_auto]">
+    <main className="grid h-screen max-h-screen gap-4 overflow-hidden p-4 [grid-template-rows:auto_minmax(0,1fr)] [grid-template-columns:minmax(300px,390px)_minmax(0,1fr)_minmax(320px,400px)] max-[820px]:h-auto max-[820px]:max-h-none max-[820px]:overflow-auto max-[820px]:[grid-template-columns:1fr] max-[820px]:[grid-template-rows:auto_auto_auto_auto]">
       <TopBar className="col-span-full">
         <ActionRow className="items-center">
           <Menu trigger={<Button size="icon" type="button" title="App menu"><MenuIcon /></Button>}>
@@ -306,7 +306,7 @@ export function AssetsPage({ onOpenMapEditor }: Props) {
         </PanelBody>
       </Panel>
 
-      <Panel as="aside" className="max-[1180px]:col-span-full">
+      <Panel as="aside">
         <PanelHeader><h2 className="m-0 text-lg">Inspector</h2></PanelHeader>
         <PanelBody>
           <Stack>
