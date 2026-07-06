@@ -585,16 +585,28 @@ function PhraseDraftFields({ phrase, materials, onChange }: { phrase: GrowthPhra
 }
 
 function FormPhraseDraftFields({ phrase, materials, onChange }: { phrase: FormPhrase; materials: string[]; onChange: (phrase: FormPhrase) => void }) {
+  const limits = formDimensionLimits(phrase.primitive);
   return (
     <>
       <SelectField label="Primitive" value={phrase.primitive} options={["stemSkin", "saddlePetal", "centerDisc", "leafBlade", "quadSlat", "seedFuzz", "importedMesh"].map((value) => ({ value, label: value }))} onChange={(primitive) => onChange({ ...phrase, primitive: primitive as FormPhrase["primitive"] })} />
       <SelectField label="Material" value={phrase.materialId} options={materials.map((value) => ({ value, label: value }))} onChange={(materialId) => onChange({ ...phrase, materialId })} />
-      <VariationField label="Length" value={phrase.length ?? { ideal: 0.08, deviation: 0.01 }} step={0.005} min={0} onChange={(length) => onChange({ ...phrase, length })} />
-      <VariationField label="Width" value={phrase.width ?? { ideal: 0.04, deviation: 0.01 }} step={0.005} min={0} onChange={(width) => onChange({ ...phrase, width })} />
+      <VariationField label="Length" value={phrase.length ?? { ideal: 0.08, deviation: 0.01 }} step={0.005} min={0} max={limits.lengthMax} deviationMax={limits.lengthMax} onChange={(length) => onChange({ ...phrase, length })} />
+      <VariationField label="Width" value={phrase.width ?? { ideal: 0.04, deviation: 0.01 }} step={0.005} min={0} max={limits.widthMax} deviationMax={limits.widthMax} onChange={(width) => onChange({ ...phrase, width })} />
       <VariationField label="Cup" value={phrase.cup ?? { ideal: 0.2, deviation: 0.05 }} step={0.01} min={0} max={1} deviationMax={1} onChange={(cup) => onChange({ ...phrase, cup })} />
       <VariationField label="Curl" value={phrase.curl ?? { ideal: 0.14, deviation: 0.04 }} step={0.01} min={0} max={1} deviationMax={1} onChange={(curl) => onChange({ ...phrase, curl })} />
     </>
   );
+}
+
+function formDimensionLimits(primitive: FormPhrase["primitive"]) {
+  if (primitive === "centerDisc") return { lengthMax: 0.18, widthMax: 0.18 };
+  if (primitive === "stemSkin") return { lengthMax: 0.7, widthMax: 0.08 };
+  if (primitive === "saddlePetal") return { lengthMax: 0.22, widthMax: 0.16 };
+  if (primitive === "leafBlade") return { lengthMax: 0.35, widthMax: 0.18 };
+  if (primitive === "quadSlat") return { lengthMax: 2.5, widthMax: 0.45 };
+  if (primitive === "seedFuzz") return { lengthMax: 0.18, widthMax: 0.08 };
+  if (primitive === "importedMesh") return { lengthMax: 1, widthMax: 1 };
+  return { lengthMax: 0.35, widthMax: 0.22 };
 }
 
 function InlineTextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
@@ -657,12 +669,13 @@ function PhraseProperties({ phrase, materials, onChange, onAddAfter, onAddInside
 }
 
 function FormPhraseProperties({ phrase, materials, onChange }: { phrase: FormPhrase; materials: string[]; onChange: (updater: (phrase: GrowthPhrase) => GrowthPhrase) => void }) {
+  const limits = formDimensionLimits(phrase.primitive);
   return (
     <>
       <SelectField label="Primitive" value={phrase.primitive} options={["stemSkin", "saddlePetal", "centerDisc", "leafBlade", "quadSlat", "seedFuzz", "importedMesh"].map((value) => ({ value, label: value }))} onChange={(primitive) => onChange((current) => current.type === "form" ? { ...current, primitive: primitive as FormPhrase["primitive"] } : current)} />
       <SelectField label="Material" value={phrase.materialId} options={materials.map((value) => ({ value, label: value }))} onChange={(materialId) => onChange((current) => current.type === "form" ? { ...current, materialId } : current)} />
-      <VariationField label="Length" value={phrase.length ?? { ideal: 0.08, deviation: 0.01 }} step={0.005} min={0} onChange={(length) => onChange((current) => current.type === "form" ? { ...current, length } : current)} />
-      <VariationField label="Width" value={phrase.width ?? { ideal: 0.04, deviation: 0.01 }} step={0.005} min={0} onChange={(width) => onChange((current) => current.type === "form" ? { ...current, width } : current)} />
+      <VariationField label="Length" value={phrase.length ?? { ideal: 0.08, deviation: 0.01 }} step={0.005} min={0} max={limits.lengthMax} deviationMax={limits.lengthMax} onChange={(length) => onChange((current) => current.type === "form" ? { ...current, length } : current)} />
+      <VariationField label="Width" value={phrase.width ?? { ideal: 0.04, deviation: 0.01 }} step={0.005} min={0} max={limits.widthMax} deviationMax={limits.widthMax} onChange={(width) => onChange((current) => current.type === "form" ? { ...current, width } : current)} />
       <VariationField label="Cup" value={phrase.cup ?? { ideal: 0.2, deviation: 0.05 }} step={0.01} min={0} max={1} deviationMax={1} onChange={(cup) => onChange((current) => current.type === "form" ? { ...current, cup } : current)} />
       <VariationField label="Curl" value={phrase.curl ?? { ideal: 0.14, deviation: 0.04 }} step={0.01} min={0} max={1} deviationMax={1} onChange={(curl) => onChange((current) => current.type === "form" ? { ...current, curl } : current)} />
     </>
@@ -774,19 +787,20 @@ function NumberField({ label, value, step, min, max, onChange }: { label: string
   const nudge = (direction: -1 | 1, multiplier = 1) => {
     const base = valueRef.current;
     const next = normalizeStep(clamp(base + (direction * step * multiplier)), step);
-    if (next === base) return;
+    if (next === base) return false;
     valueRef.current = next;
     setDraft(formatNumber(next, step));
     onChange(next);
+    return true;
   };
   const holdRate = (elapsed: number) => {
     if (elapsed < 220) return 0;
     const active = elapsed - 220;
     const ramp = Math.min(1, active / 1100);
-    if (step >= 1) return 10 + (ramp * 42);
-    if (step >= 0.01) return 18 + (ramp * 96);
-    if (step >= 0.005) return 24 + (ramp * 132);
-    return 34 + (ramp * 210);
+    if (step >= 1) return 8 + (ramp * 28);
+    if (step >= 0.01) return 12 + (ramp * 36);
+    if (step >= 0.005) return 14 + (ramp * 42);
+    return 18 + (ramp * 76);
   };
   const tickHold = (now: number) => {
     const hold = holdRef.current;
@@ -798,7 +812,10 @@ function NumberField({ label, value, step, min, max, onChange }: { label: string
     const steps = Math.floor(hold.accumulator);
     if (steps > 0) {
       hold.accumulator -= steps;
-      nudge(hold.direction, steps);
+      if (!nudge(hold.direction, steps)) {
+        stopHold();
+        return;
+      }
     }
     hold.frame = window.requestAnimationFrame(tickHold);
   };
