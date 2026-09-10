@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: "./tests/e2e",
   outputDir: ".tmp/playwright-results",
   fullyParallel: false,
+  workers: 1,
   reporter: [["list"], ["html", { outputFolder: ".tmp/playwright-report", open: "never" }]],
   use: {
     baseURL: "http://127.0.0.1:5192",

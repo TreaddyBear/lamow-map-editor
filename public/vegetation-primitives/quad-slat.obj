@@ -1,0 +1,9 @@
+# lamow: id quadSlat
+# lamow: displayName Quad Slat
+o quadSlat
+v -0.50 0.00 0.00 1 1 1
+v 0.50 0.00 0.00 1 1 1
+v 0.50 1.00 0.00 1 1 1
+v -0.50 1.00 0.00 1 1 1
+s off
+f 1 2 3 4

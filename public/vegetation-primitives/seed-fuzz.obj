@@ -1,0 +1,12 @@
+# lamow: id seedFuzz
+# lamow: displayName Seed Fuzz
+o seedFuzz
+v -0.08 0.00 0.00 1 1 1
+v 0.08 0.00 0.00 1 1 1
+v 0.00 0.04 1.00 1 1 1
+v 0.00 0.00 -0.08 1 1 1
+v 0.00 0.00 0.08 1 1 1
+v 0.04 0.04 1.00 1 1 1
+s off
+f 1 2 3
+f 4 5 6

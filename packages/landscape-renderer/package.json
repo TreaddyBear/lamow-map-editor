@@ -1,0 +1,35 @@
+{
+  "name": "@lamow/landscape-renderer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist",
+    "docs",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vegetation/*": {
+      "types": "./dist/vegetation/*.d.ts",
+      "import": "./dist/vegetation/*.js"
+    },
+    "./vegetation/fieldFlowers": {
+      "types": "./dist/vegetation/fieldFlowers.d.ts",
+      "import": "./dist/vegetation/fieldFlowers.js"
+    }
+  },
+  "peerDependencies": {
+    "@babylonjs/core": "^8.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

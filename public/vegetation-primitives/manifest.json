@@ -1,0 +1,10 @@
+{
+  "primitives": [
+    { "id": "stemSkin", "displayName": "Stem Skin", "path": "/vegetation-primitives/stem-skin.obj" },
+    { "id": "saddlePetal", "displayName": "Saddle Petal", "path": "/vegetation-primitives/saddle-petal.obj" },
+    { "id": "leafBlade", "displayName": "Leaf Blade", "path": "/vegetation-primitives/leaf-blade.obj" },
+    { "id": "centerDisc", "displayName": "Center Disc", "path": "/vegetation-primitives/center-disc.obj" },
+    { "id": "quadSlat", "displayName": "Quad Slat", "path": "/vegetation-primitives/quad-slat.obj" },
+    { "id": "seedFuzz", "displayName": "Seed Fuzz", "path": "/vegetation-primitives/seed-fuzz.obj" }
+  ]
+}

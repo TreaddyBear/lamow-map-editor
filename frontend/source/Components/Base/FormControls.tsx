@@ -36,13 +36,13 @@ export function TextAreaField({ label, value, onCommit }: { label: string; value
   );
 }
 
-export function SelectField({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
+export function SelectField({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string; disabled?: boolean }[]; onChange: (value: string) => void }) {
   return (
     <label className={fieldLabelClass}>
       {label}
       <select className={fieldControlClass} value={value} onChange={(event) => onChange(event.currentTarget.value)}>
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </option>
         ))}

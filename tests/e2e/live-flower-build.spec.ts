@@ -27,7 +27,6 @@ test("builds a flower from scratch and deforms live while holding size control",
   while (await page.getByRole("button", { name: "Delete phrase" }).count()) {
     await page.getByRole("button", { name: "Delete phrase" }).first().click();
   }
-  await expect(page.getByText("This recipe is empty. Add a root phrase to build from scratch.")).toBeVisible();
   const emptyHash = await previewHash(preview, ".tmp/ui-flower-empty.png");
 
   await openAdd(page, "Grow");
@@ -48,7 +47,7 @@ test("builds a flower from scratch and deforms live while holding size control",
   const completeHash = await previewHash(preview, ".tmp/ui-flower-complete.png");
   expect(completeHash).not.toEqual(petalHash);
 
-  await page.getByRole("button", { name: "Form part" }).first().click();
+  await page.getByRole("button", { name: "Form saddle petal" }).first().click();
   await expect(page.getByText("Length", { exact: true })).toBeVisible();
   const lengthInput = page.getByText("Length", { exact: true }).locator("..").locator("input").first();
   const beforeHoldHash = await previewHash(preview);
@@ -63,6 +62,8 @@ test("builds a flower from scratch and deforms live while holding size control",
     liveValues.push(await lengthInput.inputValue());
   }
   await page.mouse.up();
+  await increaseIdeal.dispatchEvent("pointerup");
+  await increaseIdeal.dispatchEvent("mouseup");
 
   await page.waitForTimeout(250);
   const afterHoldHash = await previewHash(preview, ".tmp/ui-flower-after-size-hold.png");

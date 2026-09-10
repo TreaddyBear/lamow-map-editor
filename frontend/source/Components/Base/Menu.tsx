@@ -23,9 +23,15 @@ export function Menu({ trigger, children, align = "start", open, onOpenChange }:
   );
 }
 
-export function MenuItem({ children, onSelect, disabled = false, tone = "default" }: { children: ReactNode; onSelect?: () => void; disabled?: boolean; tone?: "default" | "danger" }) {
+export function MenuItem({ children, onSelect, disabled = false, selected = false, tone = "default" }: { children: ReactNode; onSelect?: () => void; disabled?: boolean; selected?: boolean; tone?: "default" | "danger" }) {
   return (
-    <DropdownMenu.Item className={cn(menuItemClass, tone === "danger" && "border-[#e2b4b4] text-[#9b2424]")} disabled={disabled} onSelect={onSelect}>
+    <DropdownMenu.Item
+      aria-current={selected ? "true" : undefined}
+      className={cn(menuItemClass, selected && "bg-[var(--subtle-bg)] text-[var(--app-text)] data-[disabled]:opacity-100", tone === "danger" && "border-[#e2b4b4] text-[#9b2424]")}
+      data-selected={selected ? "" : undefined}
+      disabled={disabled || selected}
+      onSelect={onSelect}
+    >
       {children}
     </DropdownMenu.Item>
   );

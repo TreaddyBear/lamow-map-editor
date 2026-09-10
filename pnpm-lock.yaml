@@ -210,6 +210,9 @@ importers:
       '@babylonjs/core':
         specifier: ^8.56.2
         version: 8.56.2
+      '@lamow/landscape-renderer':
+        specifier: workspace:*
+        version: link:packages/landscape-renderer
       '@radix-ui/react-context-menu':
         specifier: ^2.2.16
         version: 2.2.16(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -262,6 +265,16 @@ importers:
       vite:
         specifier: ^7.0.0
         version: 7.3.3(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/landscape-renderer:
+    dependencies:
+      '@babylonjs/core':
+        specifier: ^8.0.0
+        version: 8.56.2
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
 packages:
 

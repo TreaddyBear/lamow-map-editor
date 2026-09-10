@@ -3,7 +3,7 @@ import { cn } from "./cn";
 
 export function Panel({ as: Component = "section", children, className = "", ...props }: HTMLAttributes<HTMLElement> & { as?: ElementType; children: ReactNode }) {
   return (
-    <Component {...props} className={cn("panel h-full max-h-full min-h-0 min-w-0 overflow-hidden rounded-lg border border-[var(--surface-border)] bg-[var(--surface-bg)]", className)}>
+    <Component {...props} className={cn("panel grid h-full max-h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--surface-border)] bg-[var(--surface-bg)]", className)}>
       {children}
     </Component>
   );
@@ -19,7 +19,7 @@ export function PanelHeader({ children, className = "", ...props }: HTMLAttribut
 
 export function PanelBody({ children, className = "", ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
   return (
-    <div {...props} className={cn("overflow-auto p-4", className)}>
+    <div {...props} className={cn("app-scrollbar min-h-0 overflow-y-scroll p-4 [scrollbar-gutter:stable_both-edges]", className)}>
       {children}
     </div>
   );
