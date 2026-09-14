@@ -28,8 +28,12 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
   if (!recipe) throw new Error(`Shared recipe rendering does not yet support ${shape.type}.`);
   const random = createVegetationRandom(seed);
   let phraseId = "";
-  const sample = (field: string, value: IdealVariation | undefined, fallback = 0) => {
-    const result = value ? value.ideal + (random() * 2 - 1) * value.deviation : fallback;
+  const sample = (field: string, value: IdealVariation | undefined, fallback = 0, circular = false) => {
+    // ±180° already reaches every heading. Wrapping a wider interval can weight
+    // some headings twice (e.g. ±270°), so orientation randomness saturates here.
+    // Path bend and spread are geometric amounts and must retain their full range.
+    const deviation = value ? circular ? Math.min(180, value.deviation) : value.deviation : 0;
+    const result = value ? value.ideal + (random() * 2 - 1) * deviation : fallback;
     if (options?.onSample) options.onSample({ phraseId, field, ideal: value?.ideal ?? fallback, deviation: value?.deviation ?? 0, value: result });
     return result;
   };
@@ -68,7 +72,7 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
       if (++steps > 8192) throw new Error("Recipe exceeds the construction budget.");
       if (phrase.type === "continue") {
         const distance = sample("distance", phrase.distance);
-        const arc = sample("arcDegrees", phrase.arcDegrees), azimuth = sample("arcAzimuthDegrees", phrase.arcAzimuthDegrees);
+        const arc = sample("arcDegrees", phrase.arcDegrees), azimuth = sample("arcAzimuthDegrees", phrase.arcAzimuthDegrees, 0, true);
         const local = stemGrowthVector(distance, arc, azimuth);
         // Signed travel reverses displacement without also reversing the frame.
         const nextRotation = cursor.rotation.multiply(stemOrientationQuaternion(distance === 0 ? Vector3.Zero() : stemGrowthVector(1, arc, azimuth)));
@@ -102,7 +106,7 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
         cursor.position.addInPlace(rotate(cursor, local).scale(cursor.scale));
         cursor.rotation = nextRotation;
       } else if (phrase.type === "steer") {
-        cursor.rotation = cursor.rotation.multiply(Quaternion.RotationYawPitchRoll(degreesToRadians(sample("yawDegrees", phrase.yawDegrees)), degreesToRadians(sample("pitchDegrees", phrase.pitchDegrees)), degreesToRadians(sample("rollDegrees", phrase.rollDegrees))));
+        cursor.rotation = cursor.rotation.multiply(Quaternion.RotationYawPitchRoll(degreesToRadians(sample("yawDegrees", phrase.yawDegrees, 0, true)), degreesToRadians(sample("pitchDegrees", phrase.pitchDegrees, 0, true)), degreesToRadians(sample("rollDegrees", phrase.rollDegrees, 0, true))));
         cursor.scale *= sample("scale", phrase.scale, 1);
       } else if (phrase.type === "color") {
         cursor.materialId = phrase.materialId;
@@ -134,7 +138,7 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
           child.position = attachment?.position ?? Vector3.Lerp(cursor.lastRoot, cursor.position, t);
           if (attachment) child.rotation = attachment.rotation;
           phraseId = phrase.id;
-          const around = degreesToRadians(sample("aroundAxisDegrees", phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees));
+          const around = degreesToRadians(sample("aroundAxisDegrees", phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees, 0, true));
           const theta = around + (phrase.layout === "alternating" ? i * Math.PI : i * Math.PI * 2 / Math.max(1, total));
           child.rotation = child.rotation.multiply(Quaternion.RotationYawPitchRoll(theta, -degreesToRadians(sample("deviationDegrees", phrase.deviationDegrees ?? { ideal: 55, deviation: 8 })), 0));
           walk(phrase.offshoot, child, depth + 1);

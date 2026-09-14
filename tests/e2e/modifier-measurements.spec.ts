@@ -106,3 +106,33 @@ test("Fork and Branch controls produce measured counts, offsets and orientations
     }));
   }
 });
+
+test("Any direction is a full circle and population rotation reaches real instance matrices",async({page})=>{
+  test.setTimeout(60_000);
+  const species=await importBench(page,[grow({arcDegrees:V(60),arcAzimuthDegrees:V(350,270)}),form()]);
+  await page.getByRole("button",{name:"Measure grow",exact:true}).click();
+  const direction=page.getByTestId("variation-arc-direction");
+  await expect(direction.locator("input").nth(1)).toHaveValue("180");
+  const any=page.getByRole("button",{name:"Arc direction: any direction",exact:true});
+  await expect(any).toHaveAttribute("aria-pressed","true");
+  await any.click();await expect(direction.locator("input").nth(1)).toHaveValue("0");
+  await any.click();await expect(direction.locator("input").nth(1)).toHaveValue("180");
+  // Whole turns of Ideal must leave every seeded shape unchanged.
+  await edit(page,"arc-direction",0);const before=await geometry(page,species);
+  await edit(page,"arc-direction",360);
+  await expect.poll(async()=>{const after=await geometry(page,species);return after.length===before.length&&after.every((p,i)=>p.every((v,j)=>Math.abs(v-before[i][j])<2e-6));}).toBe(true);
+  await page.getByText("Population",{exact:true}).click();
+  const population=page.getByTestId("variation-plant-rotation");
+  await expect(population.locator("input").nth(1)).toHaveValue("180");
+  await page.getByRole("button",{name:"Plant rotation: any direction",exact:true}).click();
+  await edit(page,"plant-rotation",90);
+  const matrices=()=>page.evaluate(async()=>{
+    const url=performance.getEntriesByType("resource").map(e=>e.name).find(n=>/\/@babylonjs_core\.js/.test(n))!;
+    const {EngineStore}=await import(url);const scene=EngineStore.Instances.find((e:any)=>e.getRenderingCanvas()?.dataset.testid==="vegetation-preview-board").scenes[0];
+    return scene.meshes.filter((m:any)=>m.name.startsWith("species-")&&m.layerMask===4).flatMap((m:any)=>m.thinInstanceGetWorldMatrices().map((matrix:any)=>{const a=matrix.asArray();return [a[0],a[2],a[5]];}));
+  });
+  await expect.poll(async()=>{const all=await matrices();return all.length>0&&all.every(([x,z,s])=>Math.abs(x)<2e-6&&Math.abs(z+s)<2e-6);}).toBe(true);
+  await page.getByRole("button",{name:"Plant rotation: any direction",exact:true}).click();
+  await expect.poll(async()=>{const all=await matrices();return all.some(([x])=>x<0)&&all.some(([x])=>x>0);}).toBe(true);
+  await page.screenshot({path:".tmp/angular-audit/editor-controls.png",fullPage:true});
+});

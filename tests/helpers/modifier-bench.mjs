@@ -6,6 +6,7 @@ import { defaultVegetationAsset, parseVegetationAsset } from "../../packages/lan
 import { parseObjPrimitiveMesh, objPrimitiveToRenderData } from "../../packages/landscape-renderer/dist/vegetation/objPrimitives.js";
 import { createVegetationPatchPlacements } from "../../packages/landscape-renderer/dist/vegetation/coverage.js";
 import { createVegetationSpeciesLayer } from "../../packages/landscape-renderer/dist/vegetation/speciesLayer.js";
+import { runAngularBench } from "./angular-bench.mjs";
 
 // Expected positions use elementary vector math, never the renderer's path, rotation,
 // deformation, or random functions. The trace is an input measurement, not an oracle.
@@ -251,6 +252,6 @@ export function runModifierBench() {
       assert.deepEqual(placements,createVegetationPatchPlacements(asset,{width,seed:1}).slice(0,placements.length));
     });
   });
-  const result=[...groups.values()];
+  const result=[...groups.values(), ...runAngularBench()];
   return { schemaVersion:1, tolerance:2e-6, groups:result, cases:result.reduce((n,g)=>n+g.cases.length,0), failures:result.reduce((n,g)=>n+g.failures.length,0), primitiveExtents:sources.map(p=>({id:p.id,axes:["x","y","z"].map(axis=>{const v=p.vertices.map(v=>v[axis]);return {axis,min:Math.min(...v),max:Math.max(...v),span:Math.max(...v)-Math.min(...v)};})})) };
 }

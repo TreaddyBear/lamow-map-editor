@@ -6,8 +6,34 @@ preview seed fixed, and compare a single component. **Ideal is the centre of a r
 
 For example, distance `0.05 ± 0.10` samples between **−0.05 and +0.15 m**. Negative
 results are retained. The editing limit applies to Ideal and ± individually; the
-random result can extend beyond the Ideal input's limits. Counts are the exception:
-their full range must stay between 0 and 64.
+random result can extend beyond the Ideal input's limits. Counts must stay between
+0 and 64. Direction randomness has a circular limit, explained below.
+
+## A turn, a bend, and a random heading
+
+**0°→360° travels one complete turn and ends at the same heading.** It does not
+leave an extra bend in the stem. The angular bench follows all the intermediate
+headings to check the travel rather than just comparing the endpoints.
+
+- **Arc direction** chooses the plane the stem bends in. It is not an axial twist
+  of the entire source mesh and flower. **Arc degrees** controls how far it bends.
+- **Population → Plant rotation** rotates the entire finished plant around its base,
+  including its bent stem and attached flowers. It affects the near patch and Playtest;
+  the isolated editing view stays unrotated so component edits remain easy to compare.
+- **±0°** is a fixed heading. **±90°** covers a half circle. **±180°** covers a full
+  circle. **Any direction** sets ±180°; clicking it again returns to a fixed heading
+  at Ideal. Ideal remains available when returning to a narrower sector.
+- Random directions crossing 0° wrap smoothly. For example, `350° ±20°` reaches
+  330° through 0° to 10°. Adding 360° to Ideal preserves every seeded heading.
+- Orientation deviation saturates at ±180°. Imported larger deviations display/use
+  the same full-circle range. Otherwise ±270° wraps 540° of samples onto one circle
+  and weights some headings twice. This applies to Arc direction, Around axis and
+  imported Steer rotations. Imported population yaw spans wider than 360° likewise
+  use one full circle centred on the saved range. Saved files are not rewritten on load.
+
+**Bend amount and Fork spread are not headings:** extra turns can change the actual
+path or placement pattern, so those values keep their existing ranges. Uniform yaw
+means an even distribution around the base, not uniform directions over a 3D sphere.
 
 ## Grow
 
@@ -15,7 +41,7 @@ their full range must stay between 0 and 64.
 | --- | --- | --- |
 | Distance | −0.8…0.8 m / 0.8 / 0.005 | Signed **path length**, before any inherited scale. Negative moves backward; zero moves nowhere. On an arc it is not the plant's vertical height or the straight distance between endpoints. |
 | Arc degrees | −180…180° / 180 / 1 | Total turn over a continuous arc. `90°` with direction `0°` bends from local up toward local +X; `−90°` bends toward −X. A randomized turn can reach ±360°. |
-| Arc direction | −360…360° / 360 / 1 | Chooses the bend plane around local up: 0° toward +X, 90° toward +Z. Whole turns repeat the same direction. Disabled when both arc Ideal and ± are zero. |
+| Arc direction | −360…360° / 180 / 1 | Chooses the bend plane around local up: 0° toward +X, 90° toward +Z. Whole turns repeat the same direction. Disabled when both arc Ideal and ± are zero. Any direction covers the full circle. |
 | Start radius | −0.08…0.08 m / 0.08 / 0.001 | Cross-section at the start of the path. The source mesh's X/Z coordinates are multiplied by twice this value. A source radius of 0.5 therefore produces this radius in metres. |
 | End radius | −0.08…0.08 m / 0.08 / 0.001 | Cross-section at the end; interpolated linearly from the start. Opposite signs pinch through zero; negative signs invert the cross-section. |
 | Form along path | none / stemSkin / blade | Draws a stem or slat along the path. **None still moves the cursor**, but draws no skin and disables radius controls. Zero-distance continuous growth draws no skin, while retaining its outgoing orientation. |
@@ -67,7 +93,7 @@ current origin. Branch does not move the parent's cursor.
 | --- | --- | --- |
 | Offshoot count | 1…64 / min(Ideal, 64−Ideal) / 1 | Number of child recipes, rounded after sampling as for Fork. |
 | Deviation angle | −180…180° / 180 / 1 | Tilts each child frame using **negative local X rotation**. A leaf's +Z direction tilts up at +90°. A subsequent Grow's +Y direction tilts toward −Z at +90°. These look different because leaves and growth use different forward axes. |
-| Around axis | −360…360° / 360 / 1 | Adds rotation around the attachment's local up direction, in addition to the layout's spacing. Each child samples its own value. Legacy `sideBiasDegrees` is a fallback only when this field is absent. |
+| Around axis | −360…360° / 180 / 1 | Adds rotation around the attachment's local up direction, in addition to the layout's spacing. Each child samples its own value. Legacy `sideBiasDegrees` is a fallback only when this field is absent. Any direction covers the full circle. |
 
 | Layout | Attachment fraction along the previous path | Additional around-axis spacing |
 | --- | --- | --- |
@@ -148,6 +174,7 @@ sample. Cup/Curl default to zero. Creation defaults can differ from these import
 | 100% coverage | 0.1…200 **complete plants/clusters per m²**, step 0.5. Count is `round(rate × patch area × density fraction)`. Not percentage of pixels covered by leaves. | Bench verifies exact counts and stable subsets. |
 | Patch size | 1…8 m, step 0.5; square side length | Area grows quadratically, not linearly. Bench checks boundary placement/counts. |
 | Seed | 0…4,294,967,295 integer | Deterministic placement/variant selection; repetition of shape is expected with 16 variants. |
+| Population → Plant rotation | Ideal −360…360°; ±0…180°; step 1° | Rotates the whole plant about its base. Any direction selects a full random turn. Actual 4,096-flower populations are checked for compass coverage after applying instance transforms. |
 | Slat density | 0.05…3, step 0.01 | Multiplies distant slat geometry density. Independent of near-plant coverage calibration. Existing browser tests check buffer changes; this bench does not certify perceived LOD equivalence. |
 | Coverage pattern / scale | stripes or dots; 0.1…10 m, step 0.1 | Opaque grass/vegetation surface selection. Scale changes the spatial pattern size, not opacity. |
 | Slat palette / vegetation far color | RGB hex; far-color strength 0…1, step 0.05 | Changes distant appearance. Material/vertex color, lighting and the pattern affect the displayed pixel. No colorimetric/GPU proof is claimed here. |
@@ -176,7 +203,11 @@ The bench uses a calibration tetrahedron to separate position from orientation a
 the shipped OBJ meshes to verify every transformed Form vertex. Expected calculations
 use independent trigonometry and vector operations, not the renderer's transform
 helpers. An optional compiler trace records sampled inputs; the random-range tests
-measure output endpoints directly. Geometry tolerance is 0.000002 m. Normals and
+measure output endpoints directly. Circular tests also unwrap full-turn sweeps, check
+small sectors across 0°, and count actual headings in 24 compass sectors. The report
+includes polar plots; select a result row to inspect its case. A full random circle
+must reach all sectors without significant concentration or large angular gaps, including
+after applying the real population transforms. Geometry tolerance is 0.000002 m. Normals and
 indices are checked for finite/valid output, including zero and negative dimensions.
 
 The same assertions run under `pnpm test`. Browser measurement tests additionally type

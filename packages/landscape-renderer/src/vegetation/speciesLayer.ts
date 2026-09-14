@@ -121,7 +121,9 @@ export function createVegetationSpeciesLayer(input: {
             const random = createVegetationRandom(plant.seed);
             const scaleUnit = random(), yawUnit = random();
             const scale = plant.scale ?? asset.species.instanceRanges.scale.min + scaleUnit * (asset.species.instanceRanges.scale.max - asset.species.instanceRanges.scale.min);
-            const yaw = plant.yaw ?? asset.species.instanceRanges.yaw.min + yawUnit * (asset.species.instanceRanges.yaw.max - asset.species.instanceRanges.yaw.min);
+            const yawRange = asset.species.instanceRanges.yaw;
+            const yawSpan = Math.min(Math.PI * 2, yawRange.max - yawRange.min);
+            const yaw = plant.yaw ?? (yawRange.min + yawRange.max) / 2 + (yawUnit - 0.5) * yawSpan;
             Matrix.Compose(new Vector3(scale, scale, scale), Quaternion.RotationYawPitchRoll(yaw, 0, 0), new Vector3(plant.x, input.groundHeightAt(plant.x, plant.z), plant.z)).copyToArray(source, i * 16);
           });
           batch.source = source; batch.buffer = source.slice(); batch.plantIndices = plantIndices;

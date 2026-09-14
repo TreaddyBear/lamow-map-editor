@@ -386,6 +386,9 @@ function AssetEditor({ onOpenMapEditor, onPlaytest, catalog, libraryError, onSta
               <NumberField label="Vegetation slat strength" value={asset.species.lod.farStrength ?? 0.5} step={0.05} min={0} max={1} onChange={farStrength => updateAsset(current => ({ ...current, species: { ...current.species, lod: { ...current.species.lod, farStrength } } }))} />
               <GrassLodEditor grass={grass} onChange={updateGrass} />
             </div></details>
+            <details className="rounded-md border border-[var(--input-border)] p-2"><summary className="cursor-pointer text-sm font-semibold">Population</summary><div className="mt-3 grid gap-3">
+              <VariationField circular label="Plant rotation" value={{ ideal: (asset.species.instanceRanges.yaw.min + asset.species.instanceRanges.yaw.max) * 90 / Math.PI, deviation: (asset.species.instanceRanges.yaw.max - asset.species.instanceRanges.yaw.min) * 90 / Math.PI }} step={1} min={-360} max={360} onChange={({ ideal, deviation }) => updateAsset(current => ({ ...current, species: { ...current.species, instanceRanges: { ...current.species.instanceRanges, yaw: { min: (ideal - deviation) * Math.PI / 180, max: (ideal + deviation) * Math.PI / 180 } } } }))} />
+            </div></details>
             <AddPhrasePalette materials={Object.keys(asset.species.materials)} onAdd={addRootPhrase} />
             <div className="grid gap-1">
               {recipe.root.length ? (
@@ -679,7 +682,7 @@ function PhraseDraftFields({ phrase, materials, onChange }: { phrase: GrowthPhra
           {phrase.pathMode !== "arc" && <Button size="compact" onClick={() => onChange({ ...phrase, pathMode: "arc" })}>Use curved growth</Button>}
           <VariationField label="Distance" value={phrase.distance} step={0.005} min={-recipeLimits.growDistanceMax} max={recipeLimits.growDistanceMax} deviationMax={recipeLimits.growDistanceMax} onChange={(distance) => onChange({ ...phrase, distance })} />
           <VariationField label="Arc degrees" value={phrase.arcDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-180} max={180} deviationMax={180} onChange={(arcDegrees) => onChange({ ...phrase, arcDegrees })} />
-          <VariationField disabled={(phrase.arcDegrees?.ideal ?? 0) === 0 && (phrase.arcDegrees?.deviation ?? 0) === 0} label="Arc direction" value={phrase.arcAzimuthDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(arcAzimuthDegrees) => onChange({ ...phrase, arcAzimuthDegrees })} />
+          <VariationField circular disabled={(phrase.arcDegrees?.ideal ?? 0) === 0 && (phrase.arcDegrees?.deviation ?? 0) === 0} label="Arc direction" value={phrase.arcAzimuthDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(arcAzimuthDegrees) => onChange({ ...phrase, arcAzimuthDegrees })} />
           <VariationField disabled={!phrase.formAlongPath || phrase.formAlongPath === "none"} label="Start radius" value={phrase.radiusStart ?? { ideal: 0.01, deviation: 0 }} step={0.001} min={-recipeLimits.growRadiusMax} max={recipeLimits.growRadiusMax} deviationMax={recipeLimits.growRadiusMax} onChange={(radiusStart) => onChange({ ...phrase, radiusStart })} />
           <VariationField disabled={!phrase.formAlongPath || phrase.formAlongPath === "none"} label="End radius" value={phrase.radiusEnd ?? { ideal: 0.006, deviation: 0 }} step={0.001} min={-recipeLimits.growRadiusMax} max={recipeLimits.growRadiusMax} deviationMax={recipeLimits.growRadiusMax} onChange={(radiusEnd) => onChange({ ...phrase, radiusEnd })} />
           <SelectField label="Form along path" value={phrase.formAlongPath ?? "none"} options={["none", "stemSkin", "blade"].map((value) => ({ value, label: value }))} onChange={(formAlongPath) => onChange({ ...phrase, formAlongPath: formAlongPath as "none" | "stemSkin" | "blade" })} />
@@ -698,7 +701,7 @@ function PhraseDraftFields({ phrase, materials, onChange }: { phrase: GrowthPhra
           <VariationField label="Offshoot count" value={phrase.count} integer max={recipeLimits.countMax} onChange={(count) => onChange({ ...phrase, count: count as CountVariation })} />
           <SelectField label="Layout" value={phrase.layout} options={["alongPath", "radial", "alternating", "tip", "fromForm"].map((value) => ({ value, label: value === "fromForm" ? "fromForm (unavailable)" : value, disabled: value === "fromForm" }))} onChange={(layout) => onChange({ ...phrase, layout: layout as BranchPhrase["layout"] })} />
           <VariationField label="Deviation angle" value={phrase.deviationDegrees ?? { ideal: 55, deviation: 8 }} step={1} min={-180} max={180} deviationMax={180} onChange={(deviationDegrees) => onChange({ ...phrase, deviationDegrees })} />
-          <VariationField label="Around axis" value={phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(aroundAxisDegrees) => onChange({ ...phrase, aroundAxisDegrees })} />
+          <VariationField circular label="Around axis" value={phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(aroundAxisDegrees) => onChange({ ...phrase, aroundAxisDegrees })} />
         </>
       ) : null}
       {phrase.type === "form" ? (
@@ -813,7 +816,7 @@ function PhraseProperties({ phrase, materials, onChange }: { phrase: GrowthPhras
           {phrase.pathMode !== "arc" && <Button size="compact" onClick={() => onChange(current => current.type === "continue" ? { ...current, pathMode: "arc" } : current)}>Use curved growth</Button>}
           <VariationField label="Distance" value={phrase.distance} step={0.005} min={-recipeLimits.growDistanceMax} max={recipeLimits.growDistanceMax} deviationMax={recipeLimits.growDistanceMax} onChange={(distance) => onChange((current) => current.type === "continue" ? { ...current, distance } : current)} />
           <VariationField label="Arc degrees" value={phrase.arcDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-180} max={180} deviationMax={180} onChange={(arcDegrees) => onChange((current) => current.type === "continue" ? { ...current, arcDegrees } : current)} />
-          <VariationField disabled={(phrase.arcDegrees?.ideal ?? 0) === 0 && (phrase.arcDegrees?.deviation ?? 0) === 0} label="Arc direction" value={phrase.arcAzimuthDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(arcAzimuthDegrees) => onChange((current) => current.type === "continue" ? { ...current, arcAzimuthDegrees } : current)} />
+          <VariationField circular disabled={(phrase.arcDegrees?.ideal ?? 0) === 0 && (phrase.arcDegrees?.deviation ?? 0) === 0} label="Arc direction" value={phrase.arcAzimuthDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(arcAzimuthDegrees) => onChange((current) => current.type === "continue" ? { ...current, arcAzimuthDegrees } : current)} />
           <VariationField disabled={!phrase.formAlongPath || phrase.formAlongPath === "none"} label="Start radius" value={phrase.radiusStart ?? { ideal: 0.01, deviation: 0 }} step={0.001} min={-recipeLimits.growRadiusMax} max={recipeLimits.growRadiusMax} deviationMax={recipeLimits.growRadiusMax} onChange={(radiusStart) => onChange((current) => current.type === "continue" ? { ...current, radiusStart } : current)} />
           <VariationField disabled={!phrase.formAlongPath || phrase.formAlongPath === "none"} label="End radius" value={phrase.radiusEnd ?? { ideal: 0.006, deviation: 0 }} step={0.001} min={-recipeLimits.growRadiusMax} max={recipeLimits.growRadiusMax} deviationMax={recipeLimits.growRadiusMax} onChange={(radiusEnd) => onChange((current) => current.type === "continue" ? { ...current, radiusEnd } : current)} />
           <SelectField label="Form along path" value={phrase.formAlongPath ?? "none"} options={["none", "stemSkin", "blade"].map((value) => ({ value, label: value }))} onChange={(formAlongPath) => onChange((current) => current.type === "continue" ? { ...current, formAlongPath: formAlongPath as "none" | "stemSkin" | "blade" } : current)} />
@@ -832,7 +835,7 @@ function PhraseProperties({ phrase, materials, onChange }: { phrase: GrowthPhras
           <VariationField label="Offshoot count" value={phrase.count} integer max={recipeLimits.countMax} onChange={(count) => onChange((current) => current.type === "branch" ? { ...current, count: count as CountVariation } : current)} />
           <SelectField label="Layout" value={phrase.layout} options={["alongPath", "radial", "alternating", "tip", "fromForm"].map((value) => ({ value, label: value === "fromForm" ? "fromForm (unavailable)" : value, disabled: value === "fromForm" }))} onChange={(layout) => onChange((current) => current.type === "branch" ? { ...current, layout: layout as BranchPhrase["layout"] } : current)} />
           <VariationField label="Deviation angle" value={phrase.deviationDegrees ?? { ideal: 55, deviation: 8 }} step={1} min={-180} max={180} deviationMax={180} onChange={(deviationDegrees) => onChange((current) => current.type === "branch" ? { ...current, deviationDegrees } : current)} />
-          <VariationField label="Around axis" value={phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(aroundAxisDegrees) => onChange((current) => current.type === "branch" ? { ...current, aroundAxisDegrees } : current)} />
+          <VariationField circular label="Around axis" value={phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees ?? { ideal: 0, deviation: 0 }} step={1} min={-360} max={360} deviationMax={360} onChange={(aroundAxisDegrees) => onChange((current) => current.type === "branch" ? { ...current, aroundAxisDegrees } : current)} />
         </>
       ) : null}
       {phrase.type === "form" ? (
@@ -1008,6 +1011,7 @@ function formatCompact(value: number) {
 }
 
 function VariationField({
+  circular = false,
   disabled = false,
   label,
   value,
@@ -1018,6 +1022,7 @@ function VariationField({
   deviationMax,
   onChange,
 }: {
+  circular?: boolean;
   disabled?: boolean;
   label: string;
   value: IdealVariation | CountVariation;
@@ -1030,17 +1035,17 @@ function VariationField({
 }) {
   const step = integer ? 1 : requestedStep ?? 0.01;
   const update = (patch: Partial<IdealVariation>) => {
-    const next = { ...value, ...patch };
+    const next = { ...value, deviation: circular ? Math.min(180, value.deviation) : value.deviation, ...patch };
     onChange(integer ? clampCountVariation(next) : next);
   };
   const idealMax = max;
   const idealMin = integer ? 1 : min;
-  const deviationLimit = integer ? Math.max(0, Math.min(value.ideal, 64 - value.ideal)) : deviationMax;
+  const deviationLimit = circular ? 180 : integer ? Math.max(0, Math.min(value.ideal, 64 - value.ideal)) : deviationMax;
   return (
     <fieldset disabled={disabled} data-testid={`variation-${slugifyTestId(label)}`} className="grid min-w-0 grid-cols-2 items-end gap-1.5 disabled:opacity-40">
-      <div className="col-span-2 text-xs font-bold text-[var(--muted-text)]">{label}</div>
+      <div className="col-span-2 flex items-center justify-between gap-2 text-xs font-bold text-[var(--muted-text)]"><span>{label}</span>{circular && <button type="button" aria-label={`${label}: any direction`} aria-pressed={value.deviation >= 180} title="Any direction · 360° random span" onClick={() => update({ deviation: value.deviation >= 180 ? 0 : 180 })} className="rounded border border-[var(--input-border)] px-1.5 py-0.5 text-[10px] font-normal aria-pressed:border-[#2f6f34] aria-pressed:text-[#2f6f34]">Any direction</button>}</div>
       <NumberField label="Ideal" value={value.ideal} step={step} min={idealMin} max={idealMax} onChange={(ideal) => update({ ideal })} />
-      <NumberField label="+/-" value={value.deviation} step={step} min={0} max={deviationLimit} onChange={(deviation) => update({ deviation })} />
+      <NumberField label="+/-" value={circular ? Math.min(180, value.deviation) : value.deviation} step={step} min={0} max={deviationLimit} onChange={(deviation) => update({ deviation })} />
     </fieldset>
   );
 }

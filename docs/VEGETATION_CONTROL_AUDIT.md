@@ -1,5 +1,37 @@
 # Vegetation editor corrective pass
 
+## September 14 follow-up: does the randomness make visual sense?
+
+Added 45 angular scenarios, measuring actual compass headings rather than merely
+accepting a numerical sample. Full-turn sweeps follow 5° increments and accumulate
+exactly ±360° of travel; narrow sectors cross 0° without leaks or a discontinuity.
+The tests cover Grow bend direction, Branch around-axis, imported yaw, and whole
+flowers after their real instance matrices are applied.
+
+The baseline caught **seven biased distributions**. Most visibly, ±270° described a
+540° sample interval: one half of the compass received twice as much probability
+as the other. This happened for bend direction, around-axis and imported yaw. An
+imported 540° population yaw span also biased actual flower headings.
+
+Direction variation now saturates at ±180°, one unbiased full circle. The editor
+offers **Any direction** beside the relevant fields. **Population → Plant rotation**
+exposes rotation of the complete plant around its base; the isolated plant stays in
+its editing frame. Bend amount and Fork spread keep their separate geometric meaning.
+Existing narrower variation settings preserve their sampling behavior. Larger imported
+orientation ranges retain their saved parameters but now render as one full circle.
+
+The extended bench passes **10,734 cases** and includes polar compass plots. It checks
+4,096 actual rendered flower headings, not just 16 precompiled shapes: independent
+instance rotation still permits thousands of distinct headings while keeping the
+16-shape geometry budget. Circular randomness is uniform around an axis, not a claim
+of uniform random orientation over a sphere. See the [modifier reference](VEGETATION_MODIFIERS.md).
+
+Verification: 45 core tests and seven targeted browser scenarios pass; production
+build passes. In the 4,096-flower fixture, 4,095 headings remain distinct when rounded
+to 0.0001°, with a largest compass gap of 0.72°. Warm five-view CPU updates were
+4.0–6.1 ms at default coverage and 4.7–7.5 ms with 1,008 full-density plants.
+The new controls and interactive polar plots were checked visually in Chromium.
+
 ## September 14: measured modifier ranges
 
 The current control-by-control contract is [Vegetation modifiers](VEGETATION_MODIFIERS.md).
