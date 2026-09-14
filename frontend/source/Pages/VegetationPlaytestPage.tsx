@@ -36,14 +36,15 @@ export function VegetationPlaytestPage() {
     mowerMaterial.diffuseColor = Color3.FromHexString("#edf2bb"); mowerMaterial.alpha = 0.5;
     mower.material = mowerMaterial; mower.isPickable = false; mower.setEnabled(false);
     let layer: VegetationSpeciesLayer | undefined;
+    setRemaining(0);
     try {
       const portable = parseVegetationAsset(JSON.stringify(asset));
-      if (portable.species.parts[0].shape.type !== "fieldFlower") throw new Error("This playtest currently supports field flowers.");
+      if (!["fieldFlower", "cloverCluster"].includes(portable.species.parts[0].shape.type)) throw new Error("This playtest supports field flowers and clover.");
       layer = createVegetationSpeciesLayer({ scene, asset: portable, groundHeightAt: () => 0 });
       layer.setPlants(createVegetationPatchPlacements(portable, { width: portable.editor?.preview?.groundPatchMeters ?? 4, seed: portable.editor?.preview?.populationSeed ?? 1 }));
       layerRef.current = layer;
       setRemaining(layer.plantCount); setMessage("");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not load this flower."); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not load this species."); }
     let mowing = false;
     const release = () => { mowing = false; };
     scene.onPointerObservable.add((event) => {
@@ -72,8 +73,8 @@ export function VegetationPlaytestPage() {
     <TopBar>
       <TopBarTitle>{asset.species.displayName} · Playtest</TopBarTitle>
       <span role="status" className="text-sm">{remaining} standing</span>
-      <Button onClick={() => { layerRef.current?.resetMowed(); setRemaining(layerRef.current?.plantCount ?? 0); }}>Restore flowers</Button>
-      <FileButton accept=".json" onFile={(file) => file.text().then((text) => setAsset(parseVegetationAsset(text))).catch((error) => setMessage(error.message))}>Import flower</FileButton>
+      <Button onClick={() => { layerRef.current?.resetMowed(); setRemaining(layerRef.current?.plantCount ?? 0); }}>Restore plants</Button>
+      <FileButton accept=".json" onFile={(file) => file.text().then((text) => setAsset(parseVegetationAsset(text))).catch((error) => setMessage(error.message))}>Import species</FileButton>
       <Button onClick={() => navigate("/assets")}>Back to assets</Button>
     </TopBar>
     <div className="relative min-h-0 overflow-hidden rounded-lg">

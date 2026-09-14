@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GrassLodSettings, VegetationSpeciesAssetFile } from "../utilities/assets/vegetation";
 import type { ObjPrimitiveMesh } from "../utilities/assets/objPrimitives";
+import { MenuItem, MenuLabel, MenuSeparator } from "../Components/Base/Menu";
 import { PreviewPane } from "../Components/Base/PreviewPane";
 import { createVegetationWorkspace, previewPaneIds, type PreviewAngle, type PreviewPaneId } from "./vegetationWorkspaceRuntime";
 
@@ -12,6 +13,8 @@ export function VegetationBabylonPreview({ asset, grass, primitiveMeshes, select
   const elements = useRef(new Map<PreviewPaneId, HTMLElement>());
   const runtime = useRef<ReturnType<typeof createVegetationWorkspace> | undefined>(undefined);
   const [angles, setAngles] = useState<Record<PreviewPaneId, PreviewAngle>>({ plant: "perspective", half: "perspective", full: "perspective", "lod-half": "perspective", "lod-full": "perspective" });
+  const [surfaces, setSurfaces] = useState<Record<string, string>>({ plant: "plain" });
+  const [coverages, setCoverages] = useState<Record<string, number>>({ "lod-half": 0.5, "lod-full": 1 });
   const [error, setError] = useState("");
   useEffect(() => {
     try { runtime.current = createVegetationWorkspace(canvas.current!, elements.current, { ...asset, primitives: primitiveMeshes }); }
@@ -28,7 +31,11 @@ export function VegetationBabylonPreview({ asset, grass, primitiveMeshes, select
   return <div className="relative h-full min-h-[540px] overflow-hidden rounded-lg" data-testid="vegetation-workspace">
     <canvas ref={canvas} data-testid="vegetation-preview-board" className="absolute inset-0 h-full w-full" />
     <div className="absolute inset-0 grid grid-cols-2 grid-rows-[1.5fr_1fr_1fr] gap-2">
-      {previewPaneIds.map((id, i) => <PreviewPane key={id} id={id} paneRef={element => { if (element) elements.current.set(id, element); else elements.current.delete(id); }} label={labels[i]} kind={i === 0 ? "plant" : i < 3 ? "patch" : "slat"} angle={angles[id]} onAngle={angle => { setAngles(current => ({ ...current, [id]: angle })); runtime.current?.setAngle(id, angle); }} onReset={() => runtime.current?.fit(id)} />)}
+      {previewPaneIds.map((id, i) => <PreviewPane key={id} id={id} paneRef={element => { if (element) elements.current.set(id, element); else elements.current.delete(id); }} label={labels[i]} kind={i === 0 ? "plant" : i < 3 ? "patch" : "slat"} angle={angles[id]} onAngle={angle => { setAngles(current => ({ ...current, [id]: angle })); runtime.current?.setAngle(id, angle); }} onReset={() => runtime.current?.fit(id)}>
+        <MenuSeparator/><MenuLabel>Ground</MenuLabel>
+        {(["plain", "grass", "dirt"] as const).map(surface => <MenuItem key={surface} selected={(surfaces[id] ?? "grass") === surface} onSelect={() => { setSurfaces(current => ({ ...current, [id]: surface })); runtime.current?.setGround(id, surface); }}>{surface[0].toUpperCase() + surface.slice(1)}</MenuItem>)}
+        {i >= 3 && <><MenuSeparator/><MenuLabel>Coverage</MenuLabel>{[0, 0.5, 1].map(coverage => <MenuItem key={coverage} selected={coverages[id] === coverage} onSelect={() => { setCoverages(current => ({ ...current, [id]: coverage })); runtime.current?.setSlatCoverage(id, coverage); }}>{coverage === 0 ? "100% grass" : coverage === 0.5 ? "50% vegetation" : "100% vegetation"}</MenuItem>)}</>}
+      </PreviewPane>)}
     </div>
     {error && <div role="alert" className="absolute inset-x-3 top-12 z-20 rounded bg-[var(--surface-bg)] p-3 text-sm">{error}</div>}
   </div>;

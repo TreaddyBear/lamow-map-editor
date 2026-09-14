@@ -1,6 +1,6 @@
 # Authored vegetation integration
 
-The supported handoff slice is a field-flower asset with an ordered construction recipe,
+The supported editor Playtest slice is a field-flower or clover asset with an ordered construction recipe,
 materials, and an optional embedded OBJ primitive library. The editor's closeup and population views
 and `/playtest` use `createVegetationSpeciesLayer`. The game checkout has **not** yet
 been moved onto this renderer. The older `createFieldFlowerLayer` export remains available
@@ -54,9 +54,11 @@ this field before changes here affect existing game maps.
 
 `grassBake.ts` and the shader in `slats.ts` were extracted from game commit c35d779.
 `createVegetationSlatLayer` supplies bounded patch geometry and inputs without importing game
-globals. The editor inspects far slats with wind/distance fading disabled. Terrain/mowing
-masks, mixed-species spatial tint masks and near/far transition calibration remain integration
-work. Nearby grass context is a lightweight editor representation.
+globals. The editor freezes wind time and disables distance fading. Terrain/mowing masks
+and near/far transition calibration remain game integration work. Nearby grass now uses
+the game's long blade, calibrated map density, height and color distribution through
+`createReferenceGrass`. `gameReference/` and `assets/` are refreshed by the root
+`pnpm sync:game-assets` command; the checked-in snapshot keeps builds independent of the game.
 
 Recipes execute in order. Continue moves the cursor and optionally skins the segment; steer
 changes its local orientation/scale; fork and branch execute nested copies; choose samples
@@ -83,9 +85,14 @@ this slice: port the renderer as well as the JSON.
 
 Flat base color, alpha, emissive color/strength and OBJ vertex colors render. Surface-gradient
 metadata and per-vertex emissive definitions are retained but are not implemented here.
-Grass/slat tint previews remain editor approximations. Automatic LOD switching, protected
+Grass/slat previews remain flat editor references. Mixed coverage uses opaque world-space
+stripes or dots, authored in `editor.grassLod.pattern` and `patternScale` (metres). The shader
+selects the reference grass or vegetation palette per fragment; it does not average their
+colors or enable alpha blending. Pattern edits update uniforms without rebuilding geometry.
+Automatic LOD switching, protected
 tulip interactions, and other shape-only species are outside this handoff slice.
 
 Drafts persist locally across page changes and reloads; exported JSON remains the portable
-handoff. Primitive edits currently affect the shared library in the editor workspace, so each
-export embeds the current library. The playtest imports that library into an independent scene.
+handoff. Primitive edits belong to the selected species; each export embeds its current library.
+The playtest imports that library into an independent scene. For the current game-side audit
+and clover-first migration, see [the interface audit](../../../docs/GAME_EDITOR_INTERFACE.md).

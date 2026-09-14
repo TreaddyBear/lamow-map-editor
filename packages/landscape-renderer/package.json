@@ -6,7 +6,8 @@
   "files": [
     "dist",
     "docs",
-    "README.md"
+    "README.md",
+    "assets"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -24,7 +25,8 @@
     "./vegetation/fieldFlowers": {
       "types": "./dist/vegetation/fieldFlowers.d.ts",
       "import": "./dist/vegetation/fieldFlowers.js"
-    }
+    },
+    "./assets/*": "./assets/*"
   },
   "peerDependencies": {
     "@babylonjs/core": "^8.0.0"

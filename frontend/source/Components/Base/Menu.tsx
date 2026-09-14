@@ -8,14 +8,15 @@ type MenuProps = {
   align?: "start" | "center" | "end";
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
 };
 
-export function Menu({ trigger, children, align = "start", open, onOpenChange }: MenuProps) {
+export function Menu({ trigger, children, align = "start", open, onOpenChange, onCloseAutoFocus }: MenuProps) {
   return (
     <DropdownMenu.Root open={open} onOpenChange={onOpenChange}>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className={menuContentClass} align={align} sideOffset={6}>
+        <DropdownMenu.Content onCloseAutoFocus={onCloseAutoFocus} className={menuContentClass} align={align} sideOffset={6}>
           {children}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

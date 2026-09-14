@@ -2,29 +2,38 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { VegetationSpeciesAssetFile } from "./vegetation";
 import type { ObjPrimitiveMesh } from "./objPrimitives";
 
-type Document = { speciesAssets: VegetationSpeciesAssetFile[]; primitiveMeshes: ObjPrimitiveMesh[]; selectedSpeciesId: string };
-const changed = (a: Document, b: Document) => a.speciesAssets !== b.speciesAssets || a.primitiveMeshes !== b.primitiveMeshes;
+type Document = { speciesAssets: VegetationSpeciesAssetFile[]; primitiveMeshes: ObjPrimitiveMesh[]; selectedSpeciesId: string; versionBases: Record<string, string> };
+type Snapshot = { asset: VegetationSpeciesAssetFile; primitives: ObjPrimitiveMesh[]; versionId?: string };
+type Stack = { undo: Snapshot[]; redo: Snapshot[] };
+const snapshot = (document: Document): Snapshot => ({ asset: document.speciesAssets.find(asset => asset.species.id === document.selectedSpeciesId)!, primitives: document.primitiveMeshes, versionId: document.versionBases[document.selectedSpeciesId] });
+const changed = (a: Snapshot, b: Snapshot) => a.asset !== b.asset || a.primitives !== b.primitives;
 
-/** A pointer hold/drag or focused text edit is a transaction, not hundreds of undo entries. */
+/** Each archetype owns its local history. Selection is navigation, never an edit. */
 export function useAssetHistory(document: Document, restore: (document: Document) => void) {
-  const current = useRef(document), undo = useRef<Document[]>([]), redo = useRef<Document[]>([]);
+  const current = useRef(document), stacks = useRef(new Map<string, Stack>());
   const restoreRef = useRef(restore); restoreRef.current = restore;
-  const replaying = useRef(false), start = useRef<Document | undefined>(undefined), groups = useRef(new Set<string>());
+  const replaying = useRef(false), start = useRef<Snapshot | undefined>(undefined), groups = useRef(new Set<string>());
   const [, update] = useState(0);
-  const push = (value: Document) => { undo.current.push(value); if (undo.current.length > 100) undo.current.shift(); redo.current = []; update(v => v + 1); };
+  const stack = (id = current.current.selectedSpeciesId) => { let value = stacks.current.get(id); if (!value) { value = { undo: [], redo: [] }; stacks.current.set(id, value); } return value; };
+  const push = (value: Snapshot) => { const history = stack(); history.undo.push(value); if (history.undo.length > 100) history.undo.shift(); history.redo = []; update(v => v + 1); };
+  const finish = () => { const previous = start.current; start.current = undefined; if (previous && changed(previous, snapshot(current.current))) push(previous); };
   useLayoutEffect(() => {
-    if (changed(current.current, document)) {
+    if (current.current.selectedSpeciesId !== document.selectedSpeciesId) {
+      finish(); groups.current.clear(); replaying.current = false;
+    } else if (changed(snapshot(current.current), snapshot(document))) {
       if (replaying.current) replaying.current = false;
-      else if (!start.current) push(current.current);
+      else if (!start.current) push(snapshot(current.current));
     }
-    current.current = document;
-  }, [document.speciesAssets, document.primitiveMeshes, document.selectedSpeciesId]);
-  const finish = () => { const previous = start.current; start.current = undefined; if (previous && changed(previous, current.current)) push(previous); };
-  const begin = (kind: string) => { if (!start.current) start.current = current.current; groups.current.add(kind); };
+    current.current = document; update(v => v + 1);
+  }, [document.speciesAssets, document.primitiveMeshes, document.selectedSpeciesId, document.versionBases]);
+  const begin = (kind: string) => { if (!start.current) start.current = snapshot(current.current); groups.current.add(kind); };
   const end = (kind: string) => { groups.current.delete(kind); if (!groups.current.size) finish(); };
   const apply = (back: boolean) => {
-    groups.current.clear(); finish(); const from = back ? undo.current : redo.current, to = back ? redo.current : undo.current;
-    const next = from.pop(); if (!next) return; to.push(current.current); replaying.current = true; restoreRef.current(next); update(v => v + 1);
+    groups.current.clear(); finish(); const history = stack(), from = back ? history.undo : history.redo, to = back ? history.redo : history.undo;
+    const next = from.pop(); if (!next) return;
+    const active = current.current; to.push(snapshot(active)); replaying.current = true;
+    const versionBases = { ...active.versionBases }; if (next.versionId) versionBases[active.selectedSpeciesId] = next.versionId; else delete versionBases[active.selectedSpeciesId];
+    restoreRef.current({ ...active, speciesAssets: active.speciesAssets.map(asset => asset.species.id === active.selectedSpeciesId ? next.asset : asset), primitiveMeshes: next.primitives, versionBases }); update(v => v + 1);
   };
   useLayoutEffect(() => {
     const release = () => { setTimeout(() => end("pointer"), 0); };
@@ -32,9 +41,15 @@ export function useAssetHistory(document: Document, restore: (document: Document
     return () => { window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", release); window.removeEventListener("blur", release); };
   }, []);
   const editable = (target: EventTarget) => target instanceof HTMLElement && target.matches("input,textarea,[contenteditable=true]");
+  const activeStack = stack(document.selectedSpeciesId);
   return {
     skipNextChange: () => { replaying.current = true; },
-    canUndo: undo.current.length > 0, canRedo: redo.current.length > 0, undo: () => apply(true), redo: () => apply(false),
+    reset: (id = current.current.selectedSpeciesId) => {
+      stacks.current.delete(id);
+      if (id === current.current.selectedSpeciesId) { start.current = undefined; groups.current.clear(); replaying.current = true; }
+      update(v => v + 1);
+    },
+    canUndo: activeStack.undo.length > 0, canRedo: activeStack.redo.length > 0, undo: () => apply(true), redo: () => apply(false),
     handlers: {
       onPointerDownCapture: () => begin("pointer"),
       onFocusCapture: (event: { target: EventTarget }) => { if (editable(event.target)) begin("text"); },

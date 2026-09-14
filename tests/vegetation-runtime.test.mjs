@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { NullEngine, Scene, VertexBuffer, VertexData } from "@babylonjs/core";
 import { compileVegetationPlant, createVegetationSpeciesLayer, parseVegetationAsset } from "../packages/landscape-renderer/dist/index.js";
 import { defaultVegetationAsset } from "../packages/landscape-renderer/dist/vegetation/assets.js";
@@ -8,9 +9,50 @@ import { growthArcPose, subdivideGrowthSource } from "../packages/landscape-rend
 import { createVegetationPatchPlacements } from "../packages/landscape-renderer/dist/vegetation/coverage.js";
 import { Vector3 } from "@babylonjs/core";
 import { stemGrowthVector } from "../packages/landscape-renderer/dist/vegetation/geometry.js";
+import { createReferenceGrass } from "../packages/landscape-renderer/dist/vegetation/referenceGrass.js";
+import { gameBladeGeometry, gameBladesPerSquareMeter, gameGrassSettings } from "../packages/landscape-renderer/dist/vegetation/gameReference/settings.js";
+
+test("game reference uses real blade geometry, calibrated area and repeatable instances without allocating during recipe edits", () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const layer = createReferenceGrass(scene); layer.update(4, 0.5, 3);
+  assert.deepEqual([...layer.mesh.getVerticesData("position")], gameBladeGeometry.positions);
+  assert.equal(layer.mesh.thinInstanceCount, Math.round(16 * gameBladesPerSquareMeter * 0.5));
+  const matrices = layer.mesh.thinInstanceGetWorldMatrices().map(matrix => [...matrix.asArray()]);
+  assert.ok(matrices.every(matrix => matrix.every(Number.isFinite) && matrix[5] >= gameGrassSettings.minHeight && matrix[5] <= gameGrassSettings.maxHeight));
+  const buffer = layer.mesh._thinInstanceDataStorage.matrixData;
+  layer.update(4, 0.5, 3); assert.equal(layer.mesh._thinInstanceDataStorage.matrixData, buffer);
+  layer.update(4, 1, 3); layer.update(4, 0.5, 3);
+  assert.deepEqual(layer.mesh.thinInstanceGetWorldMatrices().map(matrix => [...matrix.asArray()]), matrices);
+  layer.dispose(); assert.equal(scene.meshes.length, 0); scene.dispose(); engine.dispose();
+});
+
+test("portable history stays outside renderer assets and saved snapshots", () => {
+  const raw = { ...defaultVegetationAsset, archetypeLibrary: { versions: [{ asset: defaultVegetationAsset }] } };
+  assert.equal("archetypeLibrary" in parseVegetationAsset(JSON.stringify(raw)), false);
+});
 
 const asset = () => structuredClone({ ...defaultVegetationAsset, primitives: defaultObjPrimitiveLibrary() });
 const snapshot = (layer) => layer.meshes.map((mesh) => ({ name: mesh.name, positions: [...mesh.getVerticesData(VertexBuffer.PositionKind)], matrices: mesh.thinInstanceGetWorldMatrices().map((matrix) => [...matrix.asArray()]) }));
+
+test("the supplied authored clover round-trips through independent hosts with calibrated coverage", () => {
+  const clover = parseVegetationAsset(readFileSync(new URL("./fixtures/authored-clover.lamow-vegetation.json", import.meta.url), "utf8"));
+  assert.equal(clover.species.id, "clover");
+  for (let seed = 0; seed < 16; seed++) {
+    const parts = compileVegetationPlant(clover, seed);
+    assert.equal(parts.length, 4, "the authored three-leaf recipe takes precedence over the old shape summary");
+    assert.ok(parts.every(p => p.positions.every(Number.isFinite)));
+  }
+  const placements = createVegetationPatchPlacements(clover, { width: 4, seed: 1 });
+  assert.equal(placements.length, 2448);
+  const engine = new NullEngine(), editorScene = new Scene(engine), hostScene = new Scene(engine);
+  const editor = createVegetationSpeciesLayer({ scene: editorScene, asset: clover, groundHeightAt: () => 0 });
+  const host = createVegetationSpeciesLayer({ scene: hostScene, asset: parseVegetationAsset(JSON.stringify(clover)), groundHeightAt: () => 0 });
+  editor.setPlants(placements); host.setPlants(placements);
+  assert.deepEqual(snapshot(editor), snapshot(host));
+  const cut = host.mowCircle(0, 0, 0.45); assert.ok(cut > 0);
+  host.resetMowed(); assert.deepEqual(snapshot(editor), snapshot(host));
+  editor.dispose(); host.dispose(); editorScene.dispose(); hostScene.dispose(); engine.dispose();
+});
 
 test("signed travel, dimensions, fork offsets and scale retain their meaning through export", () => {
   const definition = asset();

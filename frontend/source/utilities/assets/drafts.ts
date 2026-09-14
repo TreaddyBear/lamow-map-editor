@@ -2,7 +2,7 @@ import { parseVegetationAsset, type VegetationSpeciesAssetFile } from "./vegetat
 import { validateObjPrimitiveMesh, type ObjPrimitiveMesh } from "./objPrimitives";
 
 export const vegetationDraftKey = "lamow.vegetation-drafts.v1";
-export type VegetationDrafts = { speciesAssets: VegetationSpeciesAssetFile[]; primitiveMeshes: ObjPrimitiveMesh[]; sourcePrimitiveMeshes?: ObjPrimitiveMesh[]; selectedSpeciesId: string };
+export type VegetationDrafts = { speciesAssets: VegetationSpeciesAssetFile[]; primitiveMeshes: ObjPrimitiveMesh[]; sourcePrimitiveMeshes?: ObjPrimitiveMesh[]; selectedSpeciesId: string; versionBases?: Record<string, string>; savedAt?: number };
 
 export function readVegetationDrafts(): { drafts?: VegetationDrafts; error?: string } {
   try {
@@ -13,6 +13,7 @@ export function readVegetationDrafts(): { drafts?: VegetationDrafts; error?: str
     const speciesAssets = value.speciesAssets.map((asset) => parseVegetationAsset(JSON.stringify(asset)));
     value.primitiveMeshes.forEach(validateObjPrimitiveMesh);
     value.sourcePrimitiveMeshes?.forEach(validateObjPrimitiveMesh);
+    if (value.versionBases && (typeof value.versionBases !== "object" || Object.values(value.versionBases).some(id => typeof id !== "string"))) throw new Error();
     return { drafts: { ...value, speciesAssets } };
   } catch {
     return { error: "Saved drafts could not be loaded. Export your work before leaving this page; the previous saved data has been retained." };

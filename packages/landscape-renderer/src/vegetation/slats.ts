@@ -1,4 +1,5 @@
 import { Color3, Effect, Mesh, ShaderMaterial, Vector2, Vector3, Vector4, VertexData, type Scene, type Texture } from "@babylonjs/core";
+import { gameGrassSettings as reference } from "./gameReference/settings.js";
 import type { GrassBake } from "./grassBake.js";
 import type { GrassLodSettings, VegetationSpeciesAssetFile } from "./assets.js";
 
@@ -7,8 +8,8 @@ import type { GrassLodSettings, VegetationSpeciesAssetFile } from "./assets.js";
 export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowTexture: Texture, layerMask: number) {
   const mesh = new Mesh("vegetation-slats-" + layerMask, scene);
   mesh.layerMask = layerMask; mesh.isPickable = false;
-  if (!Effect.ShadersStore.grassSlatsVertexShader) {
-    Effect.ShadersStore.grassSlatsVertexShader = `
+  if (!Effect.ShadersStore.vegetationSlatsVertexShader) {
+    Effect.ShadersStore.vegetationSlatsVertexShader = `
       precision highp float;
       attribute vec3 position;
       attribute vec3 normal;
@@ -119,7 +120,7 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
       }
     `;
 
-    Effect.ShadersStore.grassSlatsFragmentShader = `
+    Effect.ShadersStore.vegetationSlatsFragmentShader = `
       precision highp float;
       varying vec3 vNormal;
       varying vec3 vWorldPos;
@@ -127,6 +128,13 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
       varying float vRun;
       varying float vColorPick;
       varying float vCover;
+      uniform vec3 grassTopColorA;
+      uniform vec3 grassTopColorB;
+      uniform vec3 grassMidColor;
+      uniform vec3 grassBottomColor;
+      uniform float vegetationCoverage;
+      uniform float patternMode;
+      uniform float patternScale;
       uniform vec3 topColorA;
       uniform vec3 topColorB;
       uniform vec3 midColor;
@@ -210,11 +218,20 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
         // (blade-to-blade variation), then the length blends top -> mid -> bottom
         // through a shared knee at slatMidPoint. Two tops converging to one mid
         // and one bottom.
-        vec3 topMix = mix(topColorA, topColorB, vColorPick);
+        // Opaque spatial coverage: each fragment belongs to grass OR vegetation.
+        // World-space masks remain stable when the camera orbits and cost no draw calls.
+        vec2 cell = vWorldPos.xz / max(0.1, patternScale);
+        float pick = patternMode < 0.5
+          ? step(fract((cell.x + cell.y) * 0.70710678), vegetationCoverage)
+          : step(length(fract(cell) - 0.5), sqrt(vegetationCoverage / PI));
+        float vegetation = vegetationCoverage <= 0.0 ? 0.0 : vegetationCoverage >= 1.0 ? 1.0 : pick;
+        vec3 topMix = mix(mix(grassTopColorA, grassTopColorB, vColorPick), mix(topColorA, topColorB, vColorPick), vegetation);
+        vec3 middle = mix(grassMidColor, midColor, vegetation);
+        vec3 bottom = mix(grassBottomColor, bottomColor, vegetation);
         float knee = clamp(slatMidPoint, 0.05, 0.95);
         vec3 vert = tipAmount < knee
-          ? mix(bottomColor, midColor, tipAmount / knee)
-          : mix(midColor, topMix, (tipAmount - knee) / (1.0 - knee));
+          ? mix(bottom, middle, tipAmount / knee)
+          : mix(middle, topMix, (tipAmount - knee) / (1.0 - knee));
         vec3 base = vert * (0.78 + (0.42 * albedoDetail.g));
         vec3 ambient = base * skyAmbientColor * skyAmbientIntensity * 1.35;
         float diffuse = 0.26 + (0.74 * clamp((dot(normal, light) + 0.18) / 1.18, 0.0, 1.0));
@@ -247,43 +264,50 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
   }
 
 
-  const material = new ShaderMaterial("vegetation-slats-material-" + layerMask, scene, "grassSlats", {
+  const material = new ShaderMaterial("vegetation-slats-material-" + layerMask, scene, "vegetationSlats", {
     attributes: ["position", "normal", "uv", "groundY", "cover"],
-    uniforms: ["worldViewProjection", "cameraPosition", "bounds", "slatHeight", "topColorA", "topColorB", "midColor", "bottomColor", "slatMidPoint", "skyAmbientColor", "skyAmbientIntensity", "lightDir", "tileScale", "normalStrength", "roughness", "specIntensity", "sheen", "cutoff", "wiggleAmp", "wiggleFreq", "bendAmp", "time", "windAmp", "windDirection", "lodFade", "lodCenter", "slatFadeDistance", "slatFadeBand", "slatMaxDistance"],
+    uniforms: ["grassTopColorA", "grassTopColorB", "grassMidColor", "grassBottomColor", "vegetationCoverage", "patternMode", "patternScale", "worldViewProjection", "cameraPosition", "bounds", "slatHeight", "topColorA", "topColorB", "midColor", "bottomColor", "slatMidPoint", "skyAmbientColor", "skyAmbientIntensity", "lightDir", "tileScale", "normalStrength", "roughness", "specIntensity", "sheen", "cutoff", "wiggleAmp", "wiggleFreq", "bendAmp", "time", "windAmp", "windDirection", "lodFade", "lodCenter", "slatFadeDistance", "slatFadeBand", "slatMaxDistance"],
     samplers: ["mowField", "grassNormal", "grassAlbedo"], needAlphaTesting: true,
   });
   material.setTexture("mowField", mowTexture); material.setTexture("grassNormal", bake.normalTex); material.setTexture("grassAlbedo", bake.albedoTex);
   material.setVector4("bounds", new Vector4(-100, -100, 200, 200));
   material.setVector3("lightDir", new Vector3(-0.45, -1, 0.24).normalize());
   material.setVector2("windDirection", new Vector2(1, 0)); material.setVector2("lodCenter", Vector2.Zero());
-  for (const [name, value] of Object.entries({ slatHeight: 0.27, tileScale: 0.48, wiggleAmp: 0.015, wiggleFreq: 4, bendAmp: 0.06, windAmp: 0, time: 0, normalStrength: 0.85, roughness: 0.62, specIntensity: 2.62, sheen: 2, cutoff: 0.02, skyAmbientIntensity: 0.22, slatMidPoint: 0.4, lodFade: 0, slatFadeDistance: 0, slatFadeBand: 1, slatMaxDistance: 100 })) material.setFloat(name, value);
+  for (const [name, value] of Object.entries({ slatHeight: reference.lodSlatHeight, tileScale: reference.lodSlatTileScale, wiggleAmp: reference.lodSlatWiggle, wiggleFreq: reference.lodSlatWiggleFreq, bendAmp: reference.lodSlatBend, windAmp: reference.lodSlatWind, time: 0, normalStrength: 0.85, roughness: 0.62, specIntensity: 2.62, sheen: 2, cutoff: 0.02, skyAmbientIntensity: 0.22, slatMidPoint: 0.4, lodFade: 0, slatFadeDistance: 0, slatFadeBand: 1, slatMaxDistance: 100 })) material.setFloat(name, value);
   material.setColor3("skyAmbientColor", Color3.FromHexString("#94bfff"));
-  material.backFaceCulling = false; material.alpha = 0.999; material.forceDepthWrite = true;
+  material.backFaceCulling = false; material.alpha = 1; material.forceDepthWrite = true;
   mesh.material = material;
   let geometryKey = "";
   return {
     mesh,
     update(asset: VegetationSpeciesAssetFile, grass: GrassLodSettings, width: number, coverage: number) {
+      material.setFloat("vegetationCoverage", coverage);
+      material.setFloat("patternMode", grass.pattern === "dots" ? 1 : 0);
+      material.setFloat("patternScale", grass.patternScale ?? 0.8);
       const strength = asset.species.lod.farStrength ?? 0.5;
       const tint = Color3.FromHexString(asset.species.lod.farColor ?? asset.species.materials[asset.species.parts[0].materialId].baseColor);
+      const referenceColors: Record<string, string> = { topColorA: reference.lodSlatTopColorA, topColorB: reference.lodSlatTopColorB, midColor: reference.lodSlatMidColor, bottomColor: reference.lodSlatBottomColor };
       for (const [uniform, hex] of Object.entries({ topColorA: grass.topColorA, topColorB: grass.topColorB, midColor: grass.midColor, bottomColor: grass.bottomColor })) {
-        material.setColor3(uniform, Color3.Lerp(Color3.FromHexString(hex), tint, coverage * strength * (uniform === "bottomColor" ? 0.15 : uniform === "midColor" ? 0.5 : 1)));
+        const vegetation = Color3.Lerp(Color3.FromHexString(hex), tint, strength * (uniform === "bottomColor" ? 0.15 : uniform === "midColor" ? 0.5 : 1));
+        material.setColor3(uniform, vegetation);
+        material.setColor3("grass" + uniform[0].toUpperCase() + uniform.slice(1), Color3.FromHexString(referenceColors[uniform]));
       }
-      const key = width + ":" + grass.density;
+      const density = 1 + (grass.density - 1) * coverage;
+      const key = width + ":" + density;
       if (key === geometryKey) return;
-      const spacing = 0.5 / Math.sqrt(Math.max(0.05, grass.density));
+      const spacing = 0.5 / Math.sqrt(Math.max(0.05, density));
       const positions: number[] = [], normals: number[] = [], uvs: number[] = [], indices: number[] = [];
       let state = 713;
       const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
       for (const alongX of [true, false]) {
         for (let cross = -width / 2 + spacing / 2; cross < width / 2; cross += spacing) {
-          const line = cross + (random() - 0.5) * spacing * 0.5;
+          const line = cross + (random() - 0.5) * spacing * 0.85;
           const height = 0.5 + random() * 0.9;
           let previous = -1;
           const steps = Math.ceil(width / spacing);
           for (let n = 0; n <= steps; n++) {
             const run = -width / 2 + n / steps * width;
-            const jitter = (random() - 0.5) * spacing * 0.25;
+            const jitter = (random() - 0.5) * spacing * 0.5;
             const x = alongX ? run : line + jitter, z = alongX ? line + jitter : run;
             const index = positions.length / 3;
             positions.push(x, 0, z, x, height, z); normals.push(alongX ? 0 : 1, 0, alongX ? 1 : 0, alongX ? 0 : 1, 0, alongX ? 1 : 0);

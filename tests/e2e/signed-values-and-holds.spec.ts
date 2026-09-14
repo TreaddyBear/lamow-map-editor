@@ -1,3 +1,4 @@
+import { selectAsset, renameAsset, exportAsset } from "./asset-actions";
 import { test, expect } from "@playwright/test";
 import { previewState } from "./preview-state";
 import { readFile } from "node:fs/promises";
@@ -18,7 +19,7 @@ test("negative travel, radii, fork offsets and form dimensions remain editable a
   await set("radius", "-0.04");
   await page.getByRole("button", { name: "Form saddle petal", exact: true }).click();
   await set("length", "-0.1"); await set("width", "-0.05");
-  const downloadPromise = page.waitForEvent("download"); await page.getByRole("button", { name: "Export", exact: true }).click();
+  const downloadPromise = page.waitForEvent("download"); await exportAsset(page);
   const definition = JSON.parse(await readFile((await (await downloadPromise).path())!, "utf8"));
   const [grow, fork] = definition.species.constructionRecipe.root;
   expect(grow.distance.ideal).toBe(-0.2); expect(grow.radiusStart.ideal).toBe(-0.01); expect(grow.radiusEnd.ideal).toBe(0.01);
@@ -41,6 +42,7 @@ test("signed shape controls cross zero and persist backward growth", async ({ pa
   await expect(ideal).toHaveValue("-1");
   await ideal.fill("-90"); await ideal.blur();
   await page.getByRole("button", { name: "Reset Plant view", exact: true }).click();
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
   const backward = await previewState(page);
   await ideal.fill("90"); await ideal.blur();
   await expect.poll(async () => (await previewState(page)).meshes.map(mesh => mesh.geometry)).not.toEqual(backward.meshes.map(mesh => mesh.geometry));
@@ -60,7 +62,7 @@ test("signed shape controls cross zero and persist backward growth", async ({ pa
   expect(errors).toEqual([]);
 });
 
-test("holds accelerate gradually over nine seconds, stop on release, and restart gently", async ({ page }) => {
+test("holds accelerate gradually through fine and coarse speeds, stop on release, and restart gently", async ({ page }) => {
   test.setTimeout(45_000);
   await page.goto("/assets");
   await page.getByRole("button", { name: "Grow stem", exact: true }).click();
@@ -71,7 +73,7 @@ test("holds accelerate gradually over nine seconds, stop on release, and restart
   await button.hover();
   const samples = [await sample()];
   await page.mouse.down();
-  for (const delay of [1000, 2000, 3000, 3000]) {
+  for (const delay of [700, 1300, 1500, 1500]) {
     await page.waitForTimeout(delay); samples.push(await sample());
   }
   await page.mouse.up();

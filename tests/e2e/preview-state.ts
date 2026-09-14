@@ -27,7 +27,7 @@ export async function previewState(page: Page) {
         material: mesh.material?.diffuseColor.toHexString(), instances: mesh.thinInstanceCount,
       })),
       grass: scene.meshes.filter((mesh: any) => mesh.name.startsWith("vegetation-slats-")).map((mesh: any) => ({
-        name: mesh.name, geometry: hash(mesh.getVerticesData("position") ?? []), uniforms: mesh.material?._colors3, colors: hash(mesh.getVerticesData("color") ?? []), instances: mesh.thinInstanceCount,
+        name: mesh.name, geometry: hash(mesh.getVerticesData("position") ?? []), uniforms: mesh.material?._colors3, floats: mesh.material?._floats, alpha: mesh.material?.alpha, blending: mesh.material?.needAlphaBlending(), colors: hash(mesh.getVerticesData("color") ?? []), instances: mesh.thinInstanceCount,
       })),
     };
   });

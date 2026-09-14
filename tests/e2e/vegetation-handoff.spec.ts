@@ -1,13 +1,38 @@
+import { selectAsset, renameAsset, exportAsset } from "./asset-actions";
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+
+test("the supplied clover export imports, opens Playtest, mows and returns with the draft intact", async ({ page }) => {
+  const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
+  const file = "tests/fixtures/authored-clover.lamow-vegetation.json";
+  await page.goto("/assets");
+  await page.getByLabel("Import", { exact: true }).setInputFiles(file);
+  await expect(page.getByTestId("asset-selector")).toHaveAttribute("data-species-id", "clover");
+  await expect(page.getByTestId("preview-full")).toHaveAttribute("data-plant-count", "2448");
+  await page.getByRole("button", { name: "Playtest", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("2448 standing");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByLabel("Import species").setInputFiles(file);
+  await expect(page.getByRole("status")).toHaveText("2448 standing");
+  const box = (await page.getByTestId("playtest-canvas").boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down(); await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.6, { steps: 12 }); await page.mouse.up();
+  await expect(page.getByRole("status")).not.toHaveText("2448 standing");
+  await page.getByRole("button", { name: "Restore plants", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("2448 standing");
+  await page.screenshot({ path: ".tmp/authored-clover-playtest.png" });
+  await page.getByRole("button", { name: "Back to assets", exact: true }).click();
+  await expect(page.getByTestId("asset-selector")).toHaveAttribute("data-species-id", "clover");
+  await expect(page.getByTestId("preview-full")).toHaveAttribute("data-plant-count", "2448");
+  expect(errors).toEqual([]);
+});
 
 test("edit, export, reload, import into playtest, mow and return without losing drafts", async ({ page }) => {
   test.setTimeout(90_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/assets");
-  await page.getByLabel("Display name", { exact: true }).fill("Handoff Flower");
-  await page.getByLabel("Display name", { exact: true }).blur();
+  await renameAsset(page, "Handoff Flower");
   await page.getByRole("button", { name: "Form saddle petal", exact: true }).click();
   const cup = page.getByTestId("variation-cup").locator("input").first();
   await cup.fill("0.75"); await cup.blur();
@@ -16,18 +41,18 @@ test("edit, export, reload, import into playtest, mow and return without losing 
   const x = editor.getByTestId("obj-vertex-x").locator("input").first();
   await x.fill("-0.33"); await x.blur();
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await exportAsset(page);
   const download = await downloadPromise;
   const exported = JSON.parse(await readFile((await download.path())!, "utf8"));
   expect(exported.species.displayName).toBe("Handoff Flower");
   expect(exported.primitives.find((p: { id: string }) => p.id === "saddlePetal").vertices[0].x).toBe(-0.33);
   await page.reload();
-  await expect(page.getByLabel("Display name", { exact: true })).toHaveValue("Handoff Flower");
+  await expect(page.getByTestId("asset-selector")).toHaveText("Handoff Flower");
   await page.getByRole("tab", { name: "Meshes", exact: true }).click();
   await expect(page.getByTestId("obj-vertex-x").locator("input").first()).toHaveValue("-0.33");
   await page.getByRole("button", { name: "Playtest", exact: true }).click();
   await expect(page.getByTestId("vegetation-playtest")).toBeVisible();
-  await page.getByLabel("Import flower").setInputFiles({ name: "flower.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(exported)) });
+  await page.getByLabel("Import species").setInputFiles({ name: "flower.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(exported)) });
   await expect(page.getByRole("status")).toHaveText("400 standing");
   await expect(page.getByRole("alert")).toHaveCount(0);
   const box = (await page.getByTestId("playtest-canvas").boundingBox())!;
@@ -37,10 +62,10 @@ test("edit, export, reload, import into playtest, mow and return without losing 
   await page.mouse.up();
   await expect(page.getByRole("status")).not.toHaveText("400 standing");
   await page.screenshot({ path: ".tmp/vegetation-playtest.png" });
-  await page.getByRole("button", { name: "Restore flowers" }).click();
+  await page.getByRole("button", { name: "Restore plants" }).click();
   await expect(page.getByRole("status")).toHaveText("400 standing");
   await page.getByRole("button", { name: "Back to assets" }).click();
-  await expect(page.getByLabel("Display name", { exact: true })).toHaveValue("Handoff Flower");
+  await expect(page.getByTestId("asset-selector")).toHaveText("Handoff Flower");
   await page.getByRole("button", { name: "Form saddle petal", exact: true }).click();
   await expect(page.getByTestId("variation-cup").locator("input").first()).toHaveValue("0.75");
   await page.screenshot({ path: ".tmp/vegetation-editor-slice.png" });

@@ -1,6 +1,28 @@
+import { selectAsset, renameAsset, exportAsset } from "./asset-actions";
 import { test, expect } from "@playwright/test";
 import { previewState } from "./preview-state";
 import { readFile } from "node:fs/promises";
+
+test("grass reference stays independent of vegetation tuning and each preview can use shared ground textures", async ({ page }) => {
+  await page.goto("/assets");
+  await expect(page.getByTestId("vegetation-preview-board")).toHaveAttribute("data-update-ms", /\d/);
+  await page.getByRole("button", { name: "50% LOD view options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "100% grass", exact: true }).click();
+  const grass = (await previewState(page)).grass[0].uniforms.grassTopColorA;
+  await page.getByText("Slat editor", { exact: true }).click();
+  const color = page.locator("label").filter({ hasText: "Vegetation slat color" }).locator("input").last();
+  await color.fill("#ff0000"); await color.blur();
+  const strength = page.locator("label").filter({ hasText: "Vegetation slat strength" }).locator("input");
+  await strength.fill("1"); await strength.blur();
+  await expect.poll(async () => (await previewState(page)).grass[0].uniforms.grassTopColorA).toEqual(grass);
+  await expect.poll(async () => (await previewState(page)).grass[1].uniforms.topColorA).toMatchObject({ r: 1, g: 0, b: 0 });
+  await page.getByRole("button", { name: "Plant view options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Dirt", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.screenshot({ path: ".tmp/game-reference-preview.png" });
+  await page.getByTestId("asset-selector").click();
+  await page.screenshot({ path: ".tmp/asset-menu.png" });
+});
 
 test("five simultaneous views share an engine and calibrated coverage survives export and reload", async ({ page }) => {
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
@@ -17,7 +39,7 @@ test("five simultaneous views share an engine and calibrated coverage survives e
   await expect(page.getByTestId("preview-full")).toHaveAttribute("data-plant-count", "640");
   await expect(page.getByTestId("preview-half")).toHaveAttribute("data-plant-count", "320");
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await exportAsset(page);
   const download = await downloadPromise;
   expect(JSON.parse(await readFile((await download.path())!, "utf8")).species.coverage.plantsPerSquareMeter).toBe(40);
   await page.reload(); await expect(input).toHaveValue("40");
@@ -34,6 +56,7 @@ test("five simultaneous views share an engine and calibrated coverage survives e
   await page.getByRole("button", { name: "Plant view options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Perspective", exact: true }).click();
   await page.getByRole("button", { name: "Reset Plant view", exact: true }).click();
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
   await page.screenshot({ path: ".tmp/curved-growth-workspace.png" });
   expect(errors).toEqual([]);
 });
@@ -51,9 +74,9 @@ test("a held edit is one undo step and primitive overrides stay with their speci
   await page.getByRole("tab", { name: "Meshes", exact: true }).click();
   const x = page.getByTestId("obj-vertex-x").locator("input").first();
   const originalX = await x.inputValue(); await x.fill("-0.333"); await x.blur();
-  await page.getByRole("combobox", { name: "Species", exact: true }).selectOption("flowerWhite");
+  await selectAsset(page, "flowerWhite");
   await page.getByRole("tab", { name: "Meshes", exact: true }).click(); await expect(x).toHaveValue(originalX);
   await page.reload();
-  await page.getByRole("combobox", { name: "Species", exact: true }).selectOption("flowerBlue");
+  await selectAsset(page, "flowerBlue");
   await page.getByRole("tab", { name: "Meshes", exact: true }).click(); await expect(x).toHaveValue("-0.333");
 });

@@ -1,6 +1,28 @@
 import test from "node:test";
-import { advanceNumberHold, createNumberHoldCurve } from "../frontend/source/Components/Base/numberHold";
+import { advanceNumberHold, createNumberHoldCurve, numberFractionPadding } from "../frontend/source/Components/Base/numberHold";
 import assert from "node:assert/strict";
+import { mergeArchetypeCatalog } from "../frontend/source/utilities/assets/versionLibrary";
+import { defaultVegetationAsset } from "../frontend/source/utilities/assets/vegetation";
+
+test("numeric fractions reserve constant columns and default holds reach tuning points 50% sooner", () => {
+  assert.deepEqual(["24", "24.5", "25", "25.5"].map(value => numberFractionPadding(value, 0.5)), [2, 0, 2, 0]);
+  assert.deepEqual(["1", "1.2", "1.25"].map(value => numberFractionPadding(value, 0.01)), [3, 1, 0]);
+  const curve = createNumberHoldCurve(1, -180, 180);
+  assert.ok(Math.abs(curve.rateAt(2 / 3) - 3) < 1e-9);
+  assert.ok(Math.abs(curve.rateAt(4) - (2 + 43 * 0.8)) < 1e-9);
+  assert.equal(curve.delayMs, 200);
+});
+
+test("project standards initialize fresh drafts, preserve local work, and discover saved custom archetypes", () => {
+  const starter = structuredClone(defaultVegetationAsset);
+  const standard = structuredClone(starter); standard.species.displayName = "Approved";
+  const local = structuredClone(starter); local.species.displayName = "Work in progress";
+  const custom = structuredClone(starter); custom.species.id = "customSaved";
+  assert.equal(mergeArchetypeCatalog([starter], [{ asset: standard, isStandard: true }])[0].species.displayName, "Approved");
+  assert.equal(mergeArchetypeCatalog([starter], [{ asset: standard, isStandard: true }], [local])[0].species.displayName, "Work in progress");
+  assert.equal(mergeArchetypeCatalog([starter], [{ asset: standard, isStandard: false }])[0].species.displayName, starter.species.displayName);
+  assert.equal(mergeArchetypeCatalog([starter], [{ asset: custom, isStandard: false }])[1].species.id, "customSaved");
+});
 
 test("number holds smoothly match timing points and cap speed across small and enormous ranges", () => {
   const curve = createNumberHoldCurve(1, -180, 180, {

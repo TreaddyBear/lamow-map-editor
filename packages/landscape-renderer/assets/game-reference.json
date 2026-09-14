@@ -1,0 +1,15 @@
+{
+  "source": "LaMow working tree",
+  "refresh": "pnpm sync:game-assets [path-to-LaMow]",
+  "sha256": {
+    "src/config.ts": "7f23ed9e491b0002949f29f99b567ece2200fb833c59518b75cd89485a825206",
+    "map-exports/lawn-maps.baked.json": "5b0d7b5c3724b28d9ea498e131f3ea6ffdd050186ed0fa145f10b8956800a547",
+    "src/world.ts": "397ed87388f757298d6c1cd304c246885158398191383edcf297416c4f1af4b9",
+    "src/grass.ts": "f90af305fe4bf6a56643a4a52e8f08da420f26398d7b188bfc66633103b40a3f",
+    "src/utils/noise.ts": "3ef967ff9c6a406dd30fb28555939e4d35b14750fa715216d1eb88988abf3911",
+    "src/utils/color.ts": "605568ba3f585f7d7939d01455c0a69a180ca63a2b9f8a5dd534e6d20c770acd",
+    "src/assets/textures/ground-grassy.png": "35d732bae13e8906bb54aea3a48cf9084003fc68b15e3dd7796aa85a9b1f5a83",
+    "src/assets/textures/Dirt_02.png": "80ce292cd0c9f131d7f995c41f8d135b827fbc721daef8bbf07e0b986988b32f",
+    "src/assets/textures/Dirt_02_Nrm.png": "4fa9b84cb60f5119fd03501a264d921cf8388a8da8db5581ac9d1f2511118616"
+  }
+}

@@ -18,9 +18,9 @@ export function createNumberHoldCurve(step: number, min?: number, max?: number, 
   const maxRate = options.maxRate ?? Math.max(4, Math.min(120, rangeSteps / 8));
   const startRate = options.startRate ?? 2;
   const span = maxRate - startRate;
-  const fine = options.fine ?? { seconds: 1, stepsPerSecond: startRate + Math.min(1, span * 0.05) };
-  const coarse = options.coarse ?? { seconds: 6, stepsPerSecond: startRate + span * 0.8 };
-  const delayMs = options.delayMs ?? 300;
+  const fine = options.fine ?? { seconds: 1 / 1.5, stepsPerSecond: startRate + Math.min(1, span * 0.05) };
+  const coarse = options.coarse ?? { seconds: 6 / 1.5, stepsPerSecond: startRate + span * 0.8 };
+  const delayMs = options.delayMs ?? 200;
   if (![maxRate, startRate, fine.seconds, fine.stepsPerSecond, coarse.seconds, coarse.stepsPerSecond, delayMs].every(Number.isFinite)
     || startRate < 0 || delayMs < 0 || fine.seconds <= 0 || coarse.seconds <= fine.seconds
     || fine.stepsPerSecond <= startRate || coarse.stepsPerSecond <= fine.stepsPerSecond || maxRate <= coarse.stepsPerSecond) {
@@ -41,6 +41,12 @@ export function createNumberHoldCurve(step: number, min?: number, max?: number, 
 }
 
 export type NumberHoldProgress = { elapsedMs: number; remainder: number };
+/** Reserve the missing fraction columns so the decimal point never jumps. */
+export function numberFractionPadding(text: string, step: number) {
+  const decimals = Math.max(0, (String(step).split(".")[1] ?? "").length);
+  const fraction = text.split(".")[1];
+  return Math.max(0, decimals - (fraction?.length ?? 0) + (decimals > 0 && fraction === undefined ? 1 : 0));
+}
 /** Integrate elapsed time, not frame counts. Drop time lost to a stall instead of
  * banking a burst of changes; retain fractional increments for fine adjustments. */
 export function advanceNumberHold(progress: NumberHoldProgress, deltaMs: number, curve: ReturnType<typeof createNumberHoldCurve>) {

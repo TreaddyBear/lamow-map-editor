@@ -214,6 +214,8 @@ export type VegetationSpeciesAssetFile = {
 
 export type GrassLodSettings = {
   density: number;
+  pattern?: "stripes" | "dots";
+  patternScale?: number;
   preview50Color: ColorHex;
   preview100Color: ColorHex;
   topColorA: ColorHex;
@@ -350,10 +352,15 @@ export function parseVegetationAsset(text: string): VegetationSpeciesAssetFile {
     if (new Set(value.primitives.map((primitive) => primitive.id)).size !== value.primitives.length) throw new Error("Primitive ids must be unique.");
   }
   if (value.species.constructionRecipe) validateRecipeStructure(value.species.constructionRecipe);
+  if (value.editor?.grassLod?.pattern !== undefined && !["stripes", "dots"].includes(value.editor.grassLod.pattern)) throw new Error("Unknown slat coverage pattern.");
+  if (value.editor?.grassLod?.patternScale !== undefined && (!Number.isFinite(value.editor.grassLod.patternScale) || value.editor.grassLod.patternScale < 0.1 || value.editor.grassLod.patternScale > 10)) throw new Error("Slat pattern scale must be between 0.1 and 10 metres.");
   const species = ensureSpeciesRecipe(migrateLegacySpecies(value.species));
   validateSpecies(species);
+  // A portable archetype may carry its version archive alongside the current asset.
+  // Archives belong to the library, never inside a snapshot or renderer document.
+  const { archetypeLibrary: _archive, ...assetFields } = value as Partial<VegetationSpeciesAssetFile> & { archetypeLibrary?: unknown };
   return {
-    ...value,
+    ...assetFields,
     species,
     editor: {
       ...value.editor,

@@ -1,3 +1,4 @@
+import { selectAsset, renameAsset, exportAsset } from "./asset-actions";
 import { expect, test, type Page } from "@playwright/test";
 import { previewState } from "./preview-state";
 
@@ -46,7 +47,7 @@ test("clover and tulip recipes, branch layouts, and grass controls are connected
   test.setTimeout(60_000);
   await page.goto("/assets");
   for (const [species, phrase, field, value] of [["clover", "Form leaflet", "length", "0.14"], ["tulip", "Form tulip petal", "cup", "0.9"], ["tulip", "Form long leaf", "curl", "0.8"]]) {
-    await page.getByRole("combobox", { name: "Species", exact: true }).selectOption(species);
+    await selectAsset(page, species);
     await page.getByRole("button", { name: phrase, exact: true }).click();
     const before = await geometry(page); await edit(page, field, value);
     await expect.poll(() => geometry(page)).not.toEqual(before);
@@ -60,7 +61,7 @@ test("clover and tulip recipes, branch layouts, and grass controls are connected
   const beforeLayout = await geometry(page);
   await page.getByRole("combobox", { name: "Layout", exact: true }).selectOption("radial");
   await expect.poll(() => geometry(page)).not.toEqual(beforeLayout);
-  await page.getByRole("tab", { name: "Grass", exact: true }).click();
+  await page.getByText("Slat editor", { exact: true }).click();
   let beforeGrass = (await previewState(page)).grass;
   await page.getByRole("slider").fill("0.9");
   await expect.poll(async () => (await previewState(page)).grass).not.toEqual(beforeGrass);

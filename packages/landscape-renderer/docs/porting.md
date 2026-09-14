@@ -1,5 +1,11 @@
 # Porting the field-flower slice into LaMow
 
+This is the earlier field-flower port sketch. The September 12
+[interface audit](../../../docs/GAME_EDITOR_INTERFACE.md) supersedes its priority and
+packaging proposal: use the user's authored clover as the first game fixture and one
+maintained renderer package, rather than another editable source copy. The wrapper contract
+and radius conversion below remain relevant. No game port has been applied yet.
+
 Reviewed against editor HEAD `b77e0fd` plus the current working changes and main-game HEAD
 `c35d779`. The game is still using its own `src/fieldFlowers.ts`; earlier notes claiming a
 completed shared-package migration were inaccurate for this checkout.

@@ -1,8 +1,13 @@
-import { advanceNumberHold, createNumberHoldCurve, type HoldAcceleration, type NumberHoldProgress } from "../Components/Base/numberHold";
+import { advanceNumberHold, createNumberHoldCurve, numberFractionPadding, type HoldAcceleration, type NumberHoldProgress } from "../Components/Base/numberHold";
 import { useAssetHistory } from "../utilities/assets/useAssetHistory";
-import { Undo2, Redo2, Copy, Download, FileUp, GitBranch, GripVertical, Map, Menu as MenuIcon, PackageOpen, Plus, Split, Sprout, Trash2, Wand2 } from "lucide-react";
+import { assetDigest, readVersion, ensureArchetype, exportArchetype, transferArchetype, readVersionLibrary, mergeArchetypeCatalog, readArchetypeCatalog, type CatalogAsset } from "../utilities/assets/versionLibrary";
+import { ContextMenuRoot, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSeparator } from "../Components/Base/ContextMenu";
+import { Dialog } from "../Components/Base/Dialog";
+import { AssetMenu } from "../Views/AssetMenu";
+import { AssetVersions } from "../Views/AssetVersions";
+import { Play, ChevronDown, Undo2, Redo2, Download, FileUp, GitBranch, GripVertical, Map, Menu as MenuIcon, PackageOpen, Plus, Split, Sprout, Trash2, Wand2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent, type ReactNode } from "react";
-import { ActionRow, Button, FileButton, Menu, MenuItem, MenuLabel, MenuSeparator, Panel, PanelBody, PanelHeader, Popover, Stack, TopBar, TopBarTitle } from "../Components/Base";
+import { ActionRow, Button, FileButton, Menu, MenuItem, MenuLabel, Panel, PanelBody, PanelHeader, Popover, Stack, TopBar } from "../Components/Base";
 import { FormLabel, SelectField } from "../Components/Base/FormControls";
 import { ObjPrimitiveBabylonEditor } from "../Views/ObjPrimitiveBabylonEditor";
 import { VegetationBabylonPreview } from "../Views/VegetationBabylonPreview";
@@ -52,27 +57,52 @@ const recipeLimits = {
   forkRadiusMax: 0.3,
 } as const;
 
-export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
+export function AssetsPage(props: Props) {
+  const [boot, setBoot] = useState<{ catalog: CatalogAsset[]; error?: string }>();
+  useEffect(() => {
+    let cancelled = false;
+    readArchetypeCatalog().then(catalog => { if (!cancelled) setBoot({ catalog }); }).catch(error => { if (!cancelled) setBoot({ catalog: [], error: error.message }); });
+    return () => { cancelled = true; };
+  }, []);
+  if (!boot) return <div role="status" className="p-4">Loading archetypes…</div>;
+  return <AssetEditor {...props} catalog={boot.catalog} libraryError={boot.error} onStandardChanged={asset => setBoot(current => ({ ...current, catalog: [...(current?.catalog ?? []).filter(entry => entry.asset.species.id !== asset.species.id), { asset, isStandard: true }] }))} />;
+}
+
+function AssetEditor({ onOpenMapEditor, onPlaytest, catalog, libraryError, onStandardChanged }: Props & { catalog: CatalogAsset[]; libraryError?: string; onStandardChanged: (asset: VegetationSpeciesAssetFile) => void }) {
   const [recovery] = useState(readVegetationDrafts);
-  const [speciesAssets, setSpeciesAssets] = useState<VegetationSpeciesAssetFile[]>(() => recovery.drafts?.speciesAssets ?? makeInitialSpeciesAssets());
-  const [primitiveMeshes, setPrimitiveMeshes] = useState<ObjPrimitiveMesh[]>(() => recovery.drafts?.primitiveMeshes ?? defaultObjPrimitiveLibrary());
+  const [speciesAssets, setSpeciesAssets] = useState<VegetationSpeciesAssetFile[]>(() => mergeArchetypeCatalog(makeInitialSpeciesAssets(), catalog, recovery.drafts?.speciesAssets));
+  const [primitiveMeshes, setPrimitiveMeshes] = useState<ObjPrimitiveMesh[]>(() => recovery.drafts?.primitiveMeshes ?? speciesAssets.find(asset => asset.species.id === defaultVegetationAsset.species.id)?.primitives ?? defaultObjPrimitiveLibrary());
   const [selectedSpeciesId, setSelectedSpeciesId] = useState(recovery.drafts?.selectedSpeciesId ?? defaultVegetationAsset.species.id);
+  const [versionBases, setVersionBases] = useState<Record<string, string>>(() => {
+    const starterIds = new Set(makeInitialSpeciesAssets().map(asset => asset.species.id));
+    const draftIds = new Set(recovery.drafts?.speciesAssets.map(asset => asset.species.id));
+    const fresh = catalog.filter(entry => entry.versionId && !draftIds.has(entry.asset.species.id) && (entry.isStandard || !starterIds.has(entry.asset.species.id)));
+    const recovered = Object.entries(recovery.drafts?.versionBases ?? {}).filter(([id]) => draftIds.has(id));
+    return Object.fromEntries([...fresh.map(entry => [entry.asset.species.id, entry.versionId!]), ...recovered]);
+  });
+  const initialBases = useRef(new globalThis.Map([...makeInitialSpeciesAssets(), ...catalog.map(entry => entry.asset)].map(asset => [asset.species.id, asset])));
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [pendingImport, setPendingImport] = useState<string>();
+  const [importBusy, setImportBusy] = useState(false), [importError, setImportError] = useState("");
+  const [removing, setRemoving] = useState(false);
+  const [autosave, setAutosave] = useState<{ state: "pending" | "saved" | "error"; at?: number }>({ state: "pending", at: recovery.drafts?.savedAt });
   const [primitivesReady, setPrimitivesReady] = useState(Boolean(recovery.drafts));
   const editedPrimitiveIds = useRef(new Set<string>());
-  const sourceLibrary = useRef(recovery.drafts?.sourcePrimitiveMeshes ?? primitiveMeshes);
-  const importedPrimitiveLibrary = useRef(false);
-  const draftRef = useRef({ speciesAssets, primitiveMeshes, selectedSpeciesId, sourcePrimitiveMeshes: sourceLibrary.current });
-  draftRef.current = { speciesAssets, primitiveMeshes, selectedSpeciesId, sourcePrimitiveMeshes: sourceLibrary.current };
+  const sourceLibrary = useRef(recovery.drafts?.sourcePrimitiveMeshes ?? defaultObjPrimitiveLibrary());
+  const importedPrimitiveLibrary = useRef(Boolean(speciesAssets.find(asset => asset.species.id === selectedSpeciesId)?.primitives));
+  const draftRef = useRef({ speciesAssets, primitiveMeshes, selectedSpeciesId, versionBases, sourcePrimitiveMeshes: sourceLibrary.current });
+  draftRef.current = { speciesAssets, primitiveMeshes, selectedSpeciesId, versionBases, sourcePrimitiveMeshes: sourceLibrary.current };
   const [selectedPrimitiveId, setSelectedPrimitiveId] = useState(defaultObjPrimitiveId);
   const [selectedPrimitiveVertexIndex, setSelectedPrimitiveVertexIndex] = useState(0);
   const [selectedPhraseId, setSelectedPhraseId] = useState("petal-whorl");
-  const [message, setMessage] = useState(recovery.error ?? "");
-  const [inspectorTab, setInspectorTab] = useState<"recipe" | "materials" | "primitives" | "grass">("recipe");
+  const [message, setMessage] = useState(recovery.error ?? libraryError ?? "");
+  const [inspectorTab, setInspectorTab] = useState<"recipe" | "materials" | "primitives">("recipe");
   const [draggedPhraseId, setDraggedPhraseId] = useState<string | undefined>();
   const [dropTarget, setDropTarget] = useState<PhraseDropTarget | undefined>();
   const asset = speciesAssets.find((item) => item.species.id === selectedSpeciesId) ?? speciesAssets[0] ?? defaultVegetationAsset;
-  const history = useAssetHistory({ speciesAssets, primitiveMeshes, selectedSpeciesId }, restored => {
+  const history = useAssetHistory({ speciesAssets, primitiveMeshes, selectedSpeciesId, versionBases }, restored => {
     setSpeciesAssets(restored.speciesAssets); setPrimitiveMeshes(restored.primitiveMeshes); setSelectedSpeciesId(restored.selectedSpeciesId);
+    setVersionBases(restored.versionBases);
   });
   const grass = asset.editor?.grassLod ?? defaultGrassLodSettings;
   const shape = asset.species.parts[0].shape;
@@ -85,8 +115,7 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
         ? cloverClusterShapeToRecipe(cloverClusterShape, asset.species.parts[0].materialId)
         : defaultVegetationAsset.species.constructionRecipe!);
   const selectedPhrase = findPhrase(recipe.root, selectedPhraseId);
-  const exportText = useMemo(() => JSON.stringify({ ...asset, primitives: primitiveMeshes }, null, 2), [asset, primitiveMeshes]);
-  const builtInIds = useMemo(() => new Set(["flowerBlue", "flowerWhite", "flowerYellow", "flowerRed", "clover", "tulip"]), []);
+  const completeAsset = useMemo(() => ({ ...asset, primitives: primitiveMeshes }), [asset, primitiveMeshes]);
   const isProtectedSpecies = asset.editor?.tags?.includes("starter") && !asset.editor?.tags?.includes("custom");
   const canDeleteSpecies = !isProtectedSpecies && speciesAssets.length > 1;
 
@@ -96,11 +125,13 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
     loadBuiltInObjPrimitiveLibrary().then((loaded) => {
       if (cancelled) return;
       sourceLibrary.current = loaded;
-      history.skipNextChange();
-      setPrimitiveMeshes((current) => importedPrimitiveLibrary.current ? current : [
+      if (!importedPrimitiveLibrary.current) {
+        history.skipNextChange();
+        setPrimitiveMeshes((current) => [
         ...loaded.map((primitive) => editedPrimitiveIds.current.has(primitive.id) ? current.find((item) => item.id === primitive.id) ?? primitive : primitive),
         ...current.filter((primitive) => editedPrimitiveIds.current.has(primitive.id) && !loaded.some((item) => item.id === primitive.id)),
-      ]);
+        ]);
+      }
       setPrimitivesReady(true);
       if (!loaded.some((primitive) => primitive.id === selectedPrimitiveId)) {
         setSelectedPrimitiveId(loaded[0]?.id ?? defaultObjPrimitiveId);
@@ -113,17 +144,25 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!primitivesReady || recovery.error) return;
+    if (recovery.error) { setAutosave({ state: "error" }); return; }
+    if (!primitivesReady) return;
+    setAutosave(current => current.state === "pending" ? current : ({ ...current, state: "pending" }));
     const timeout = window.setTimeout(() => {
-      try { localStorage.setItem(vegetationDraftKey, JSON.stringify(draftRef.current)); }
-      catch { setMessage("Draft storage is unavailable or full. Export your work before leaving this page."); }
+      try {
+        const at = Date.now();
+        localStorage.setItem(vegetationDraftKey, JSON.stringify({ ...draftRef.current, savedAt: at }));
+        setAutosave({ state: "saved", at });
+      } catch {
+        setAutosave({ state: "error" });
+        setMessage("Draft storage is unavailable or full. Save a version or export your work before leaving this page.");
+      }
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [speciesAssets, primitiveMeshes, selectedSpeciesId, primitivesReady, recovery]);
+  }, [speciesAssets, primitiveMeshes, selectedSpeciesId, versionBases, primitivesReady, recovery]);
 
   useEffect(() => {
     if (!primitivesReady || recovery.error) return;
-    const flush = () => { try { localStorage.setItem(vegetationDraftKey, JSON.stringify(draftRef.current)); } catch { /* The editor reports storage failures on its next scheduled save. */ } };
+    const flush = () => { try { localStorage.setItem(vegetationDraftKey, JSON.stringify({ ...draftRef.current, savedAt: Date.now() })); } catch { /* The editor reports storage failures on its next scheduled save. */ } };
     window.addEventListener("pagehide", flush);
     return () => { window.removeEventListener("pagehide", flush); flush(); };
   }, [primitivesReady, recovery]);
@@ -164,29 +203,16 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
     applyRecipeRoot([...recipe.root, phrase], phrase.id);
   };
 
-  const addAfterSelected = (phrase: GrowthPhrase) => {
-    if (!selectedPhrase) return addRootPhrase(phrase);
-    applyRecipeRoot(insertPhraseAfter(recipe.root, selectedPhrase.id, phrase), phrase.id);
+  const insertRecipePhrase = (targetId: string, position: PhraseDropPosition, phrase: GrowthPhrase) => {
+    const inserted = insertPhraseAtTarget(recipe.root, targetId, prepareNewPhrase(phrase, Object.keys(asset.species.materials)), position);
+    if (inserted.inserted) applyRecipeRoot(inserted.phrases, phrase.id);
   };
 
-  const addInsideSelected = (phrase: GrowthPhrase) => {
-    if (!selectedPhrase) return addRootPhrase(phrase);
-    const nextRoot = updatePhrase(recipe.root, selectedPhrase.id, (current) => {
-      if (current.type === "fork") return { ...current, continuation: [...current.continuation, phrase] };
-      if (current.type === "branch") return { ...current, offshoot: [...current.offshoot, phrase] };
-      if (current.type === "choose") {
-        const [firstOption, ...rest] = current.options;
-        const option = firstOption ?? { weight: 1, phrase: [] };
-        return { ...current, options: [{ ...option, phrase: [...option.phrase, phrase] }, ...rest] };
-      }
-      return current;
-    });
-    applyRecipeRoot(nextRoot, phrase.id);
-  };
-
-  const createNewSpecies = () => {
-    const id = uniqueSpeciesId(speciesAssets, "customFlower");
-    const next = cloneAsset(defaultVegetationAsset);
+  const createNewSpecies = async () => {
+    const index = await readVersionLibrary();
+    const occupied = new Set([...speciesAssets.map(item => item.species.id), ...index.archetypes.map(item => item.speciesId)]);
+    let id = "customFlower", suffix = 2; while (occupied.has(id)) id = "customFlower" + suffix++;
+    const next = cloneAsset(catalog.find(entry => entry.isStandard && entry.asset.species.id === defaultVegetationAsset.species.id)?.asset ?? defaultVegetationAsset);
     next.species = {
       ...next.species,
       id,
@@ -196,6 +222,7 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
       ...next.editor,
       tags: ["field-flower", "custom"],
     };
+    initialBases.current.set(id, next);
     setSpeciesAssets((current) => [...current, next]);
     setSelectedSpeciesId(id);
     setPrimitiveMeshes(next.primitives ?? sourceLibrary.current);
@@ -203,22 +230,15 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
     setMessage(`Created species "${id}".`);
   };
 
-  const duplicateSpecies = () => {
-    const id = uniqueSpeciesId(speciesAssets, `${asset.species.id}Copy`);
-    const next = cloneAsset(asset);
-    next.species = {
-      ...next.species,
-      id,
-      displayName: `${asset.species.displayName} Copy`,
-    };
-    next.editor = {
-      ...next.editor,
-      tags: [...new Set([...(next.editor?.tags ?? []).filter((tag) => tag !== "starter"), "custom"])],
-    };
-    setSpeciesAssets((current) => [...current, next]);
-    setSelectedSpeciesId(id);
-    setSelectedPhraseId(next.species.constructionRecipe?.root[0]?.id ?? "grow-stem");
-    setMessage(`Duplicated species as "${id}".`);
+  const duplicateSpecies = async () => {
+    const base = initialBases.current.get(asset.species.id) ?? asset;
+    const index = await ensureArchetype({ ...base, primitives: base.primitives ?? sourceLibrary.current });
+    const occupied = new Set([...speciesAssets.map(item => item.species.id), ...index.archetypes.map(item => item.speciesId)]);
+    let id = asset.species.id + "Copy", suffix = 2; while (occupied.has(id)) id = asset.species.id + "Copy" + suffix++;
+    const result = await transferArchetype({ asset: completeAsset, expectedRevision: index.revision, sourceSpeciesId: asset.species.id, targetId: id, displayName: asset.species.displayName + " Copy", currentVersionId: versionBases[asset.species.id] });
+    initialBases.current.set(id, result.asset);
+    setSpeciesAssets(current => [...current, result.asset]); setVersionBases(current => ({ ...current, [id]: result.currentVersionId }));
+    setSelectedSpeciesId(id); setPrimitiveMeshes(result.asset.primitives!); setSelectedPhraseId(result.asset.species.constructionRecipe?.root[0]?.id ?? "");
   };
 
   const deletePhrase = (phraseId: string) => {
@@ -277,110 +297,95 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
       setMessage("Built-in starter species are protected. Duplicate one, then edit or delete the duplicate.");
       return;
     }
+    history.reset(asset.species.id);
     const remaining = speciesAssets.filter((item) => item.species.id !== asset.species.id);
     const next = remaining[0] ?? defaultVegetationAsset;
     setSpeciesAssets(remaining.length ? remaining : [next]);
+    setVersionBases(current => { const nextBases = { ...current }; delete nextBases[asset.species.id]; return nextBases; });
     setSelectedSpeciesId(next.species.id);
     setPrimitiveMeshes(next.primitives ?? sourceLibrary.current);
     setSelectedPhraseId(next.species.constructionRecipe?.root[0]?.id ?? "grow-stem");
-    setMessage(`Deleted species "${asset.species.id}".`);
+    setMessage(`Removed draft "${asset.species.id}". Any saved versions remain in the project library and are available again after reopening the editor.`);
   };
 
-  const loadJsonText = (text: string) => {
-    try {
-      const next = parseVegetationAsset(text);
-      if (next.primitives) importedPrimitiveLibrary.current = true;
-      setPrimitiveMeshes(next.primitives ?? sourceLibrary.current);
-      setSpeciesAssets((current) => {
-        const exists = current.some((item) => item.species.id === next.species.id);
-        return exists ? current.map((item) => item.species.id === next.species.id ? next : item) : [...current, next];
-      });
-      setSelectedSpeciesId(next.species.id);
-      setSelectedPhraseId(next.species.constructionRecipe?.root[0]?.id ?? "grow-stem");
-      setMessage(`Imported species "${next.species.id}".`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not import vegetation asset.");
+  const loadJsonText = async (text: string) => {
+    const raw = JSON.parse(text), parsed = parseVegetationAsset(text);
+    const index = await readVersionLibrary();
+    const result = await transferArchetype({ asset: { ...parsed, primitives: parsed.primitives ?? sourceLibrary.current }, expectedRevision: index.revision, bundle: raw.archetypeLibrary });
+    const next = result.asset;
+    history.reset(next.species.id);
+    importedPrimitiveLibrary.current = true; initialBases.current.set(next.species.id, next);
+    setPrimitiveMeshes(next.primitives!);
+    setSpeciesAssets(current => current.some(item => item.species.id === next.species.id) ? current.map(item => item.species.id === next.species.id ? next : item) : [...current, next]);
+    setVersionBases(current => ({ ...current, [next.species.id]: result.currentVersionId }));
+    setSelectedSpeciesId(next.species.id); setSelectedPhraseId(next.species.constructionRecipe?.root[0]?.id ?? ""); setPendingImport(undefined);
+  };
+  const importFile = async (file: File) => {
+    const text = await file.text(); const next = parseVegetationAsset(text);
+    const existing = speciesAssets.find(item => item.species.id === next.species.id);
+    if (existing) {
+      const id = versionBases[existing.species.id];
+      const base = id ? (await readVersion(id)).asset : initialBases.current.get(existing.species.id);
+      const current = existing.species.id === asset.species.id ? completeAsset : { ...existing, primitives: existing.primitives ?? sourceLibrary.current };
+      const baseline = base && { ...base, primitives: base.primitives ?? sourceLibrary.current };
+      if (!baseline || await assetDigest(current) !== await assetDigest(baseline)) { setImportError(""); setPendingImport(text); return; }
     }
+    await loadJsonText(text);
+  };
+  const downloadJson = async () => {
+    const exported = await exportArchetype(completeAsset, versionBases[asset.species.id] ?? null);
+    const blob = new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+    anchor.href = url; anchor.download = asset.species.id + ".lamow-vegetation.json";
+    document.body.append(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
   };
 
-  const downloadJson = () => {
-    const blob = new Blob([exportText], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${asset.species.id}.lamow-vegetation.json`;
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-    setMessage("Exported vegetation species JSON.");
+  const restoreVersion = (saved: VegetationSpeciesAssetFile, versionId: string) => {
+    importedPrimitiveLibrary.current = true;
+    history.reset(saved.species.id);
+    updateAsset(() => saved);
+    setVersionBases(current => ({ ...current, [saved.species.id]: versionId }));
+    setPrimitiveMeshes(saved.primitives ?? sourceLibrary.current);
+    setSelectedPhraseId(saved.species.constructionRecipe?.root[0]?.id ?? "");
+    setSelectedPrimitiveId(saved.primitives?.[0]?.id ?? defaultObjPrimitiveId);
+    setSelectedPrimitiveVertexIndex(0);
   };
 
   return (
-    <main {...history.handlers} data-testid="asset-editor" className="grid h-screen max-h-screen gap-4 overflow-hidden p-4 [grid-template-rows:auto_minmax(0,1fr)] [grid-template-columns:minmax(230px,280px)_minmax(400px,1fr)_minmax(290px,340px)] max-[820px]:h-auto max-[820px]:max-h-none max-[820px]:overflow-auto max-[820px]:[grid-template-columns:1fr] max-[820px]:[grid-template-rows:auto_auto_auto_auto]">
-      <TopBar className="col-span-full">
-        <ActionRow className="items-center">
-          <Button size="compact" aria-label="Undo" disabled={!history.canUndo} onClick={history.undo}><Undo2 size={16}/></Button>
-          <Button size="compact" aria-label="Redo" disabled={!history.canRedo} onClick={history.redo}><Redo2 size={16}/></Button>
+    <main {...history.handlers} onContextMenu={event => event.preventDefault()} data-testid="asset-editor" className="grid h-screen max-h-screen gap-4 overflow-hidden p-4 [grid-template-rows:auto_minmax(0,1fr)] [grid-template-columns:minmax(230px,280px)_minmax(400px,1fr)_minmax(290px,340px)] max-[984px]:[grid-template-columns:minmax(230px,280px)_minmax(280px,1fr)_minmax(290px,340px)] max-[900px]:h-auto max-[900px]:max-h-none max-[900px]:overflow-auto max-[900px]:[grid-template-columns:1fr] max-[900px]:[grid-template-rows:auto_auto_auto_auto]">
+      <TopBar className="col-span-full flex-wrap gap-y-2" data-testid="asset-topbar">
+        <div className="flex shrink-0 items-center gap-3">
           <Menu trigger={<Button size="icon" type="button" aria-label="App menu"><MenuIcon /></Button>}>
             <MenuLabel>Navigate</MenuLabel>
             <MenuItem onSelect={onOpenMapEditor}><Map className="mr-2 inline h-4 w-4" /> Map editor</MenuItem>
             <MenuItem disabled><PackageOpen className="mr-2 inline h-4 w-4" /> Asset editor</MenuItem>
-            <MenuSeparator />
-            <MenuLabel>Assets</MenuLabel>
-            <MenuItem onSelect={createNewSpecies}><Wand2 className="mr-2 inline h-4 w-4" /> New species</MenuItem>
-            <MenuItem onSelect={duplicateSpecies}><Copy className="mr-2 inline h-4 w-4" /> Duplicate species</MenuItem>
           </Menu>
-          <TopBarTitle>Vegetation Assets</TopBarTitle>
-        </ActionRow>
-        <ActionRow className="items-center">
-          <div className="min-w-0 truncate text-sm font-semibold text-[var(--muted-text)]">{asset.species.displayName}</div>
-          {shape.type === "fieldFlower" && <Button type="button" size="compact" onClick={() => onPlaytest({ ...asset, primitives: primitiveMeshes })}>Playtest</Button>}
-        </ActionRow>
+          <h1 className="m-0 text-xl font-semibold leading-tight text-[var(--muted-text)]">Vegetation Assets</h1>
+        </div>
+        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-2" data-testid="asset-document-controls">
+          {draftDirty && <span data-testid="asset-autosave" data-state={autosave.state} className="text-[0.68rem] text-[var(--muted-text)]">{autosave.state === "error" ? "Autosave unavailable" : autosave.state === "pending" ? "Autosave" : "Autosaved " + new Date(autosave.at!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).replace(" AM", " a").replace(" PM", " p")}</span>}
+          <AssetMenu asset={asset} assets={speciesAssets} onSelect={selectSpecies} onNew={createNewSpecies} onDuplicate={duplicateSpecies} onImport={importFile} onExport={downloadJson} onRename={displayName => updateAsset(current => ({ ...current, species: { ...current.species, displayName } }))} onRemove={() => draftDirty ? setRemoving(true) : deleteSpecies()} canRemove={canDeleteSpecies} />
+          {primitivesReady && <AssetVersions key={asset.species.id} asset={completeAsset} baselineAsset={{ ...(initialBases.current.get(asset.species.id) ?? asset), primitives: initialBases.current.get(asset.species.id)?.primitives ?? sourceLibrary.current }} currentVersionId={versionBases[asset.species.id] ?? null} onVersionSaved={id => setVersionBases(current => current[asset.species.id] === id ? current : ({ ...current, [asset.species.id]: id }))} onDirtyChange={setDraftDirty} onRestore={restoreVersion} onStandardChanged={onStandardChanged} />}
+          <div className="flex items-center gap-1">
+            <Button size="compact" aria-label="Undo" title="Undo" disabled={!history.canUndo} onClick={history.undo}><Undo2 size={16}/></Button>
+            <Button size="compact" aria-label="Redo" title="Redo" disabled={!history.canRedo} onClick={history.redo}><Redo2 size={16}/></Button>
+          </div>
+          {(shape.type === "fieldFlower" || shape.type === "cloverCluster") && <Button type="button" size="compact" aria-label="Playtest" title="Play" onClick={() => onPlaytest(completeAsset)}><Play size={16}/></Button>}
+        </div>
       </TopBar>
 
-      <Panel as="aside">
-        <PanelHeader><h2 className="m-0 text-lg">Species / Recipe</h2></PanelHeader>
+      <Panel as="aside" className="col-start-1 row-start-2 max-[900px]:col-start-1 max-[900px]:row-start-auto">
+        <PanelHeader><h2 className="m-0 text-lg">Vegetation</h2></PanelHeader>
         <PanelBody data-testid="asset-species-panel-body">
           <Stack>
-            <SelectField
-              label="Species"
-              value={asset.species.id}
-              options={speciesAssets.map((item) => ({ value: item.species.id, label: item.species.displayName }))}
-              onChange={selectSpecies}
-            />
             <NumberField label="100% coverage · plants/m²" value={asset.species.coverage?.plantsPerSquareMeter ?? 25} step={0.5} min={0.1} max={200} onChange={(plantsPerSquareMeter) => updateAsset(current => ({ ...current, species: { ...current.species, coverage: { plantsPerSquareMeter } } }))} />
-            <ActionRow>
-              <Button type="button" size="compact" onClick={createNewSpecies}><Wand2 className="mr-1 h-4 w-4" /> New</Button>
-              <Button type="button" size="compact" onClick={duplicateSpecies}><Copy className="mr-1 h-4 w-4" /> Duplicate</Button>
-              <Button type="button" tone="danger" size="compact" disabled={!canDeleteSpecies} onClick={deleteSpecies}><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>
-            </ActionRow>
-            {!isProtectedSpecies ? (
-              <TextField
-                label="Species id"
-                value={asset.species.id}
-                onChange={(id) => {
-                  if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(id)) {
-                    setMessage("Species id must start with a letter and use only letters, numbers, underscores, or dashes.");
-                    return false;
-                  }
-                  if (builtInIds.has(id) && id !== asset.species.id) {
-                    setMessage(`Species id "${id}" is reserved for a built-in species.`);
-                    return false;
-                  }
-                  if (id !== asset.species.id && speciesAssets.some((item) => item.species.id === id)) {
-                    setMessage(`Species id "${id}" already exists.`);
-                    return false;
-                  }
-                  const previousId = asset.species.id;
-                  updateAsset((current) => ({ ...current, species: { ...current.species, id } }));
-                  setSelectedSpeciesId(id);
-                  setMessage(`Renamed species "${previousId}" to "${id}".`);
-                  return true;
-                }}
-              />
-            ) : null}
-            <TextField label="Display name" value={asset.species.displayName} onChange={(displayName) => updateAsset((current) => ({ ...current, species: { ...current.species, displayName } }))} />
+            <details className="rounded-md border border-[var(--input-border)] p-2"><summary className="cursor-pointer text-sm font-semibold">Slat editor</summary><div className="mt-3 grid gap-3">
+              <NumberField label="Patch width · metres" value={asset.editor?.preview?.groundPatchMeters ?? 4} step={0.5} min={1} max={8} onChange={groundPatchMeters => updateAsset(current => ({ ...current, editor: { ...current.editor, preview: { ...current.editor?.preview, groundPatchMeters } } }))} />
+              <NumberField label="Population seed" value={asset.editor?.preview?.populationSeed ?? 1} step={1} min={0} max={4294967295} onChange={populationSeed => updateAsset(current => ({ ...current, editor: { ...current.editor, preview: { ...current.editor?.preview, populationSeed } } }))} />
+              <ColorField label="Vegetation slat color" value={asset.species.lod.farColor ?? asset.species.materials[asset.species.parts[0].materialId].baseColor} onChange={farColor => updateAsset(current => ({ ...current, species: { ...current.species, lod: { ...current.species.lod, farColor } } }))} />
+              <NumberField label="Vegetation slat strength" value={asset.species.lod.farStrength ?? 0.5} step={0.05} min={0} max={1} onChange={farStrength => updateAsset(current => ({ ...current, species: { ...current.species, lod: { ...current.species.lod, farStrength } } }))} />
+              <GrassLodEditor grass={grass} onChange={updateGrass} />
+            </div></details>
             <AddPhrasePalette materials={Object.keys(asset.species.materials)} onAdd={addRootPhrase} />
             <div className="grid gap-1">
               {recipe.root.length ? (
@@ -400,6 +405,7 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
                       setDropTarget(undefined);
                     }}
                     onMove={movePhrase}
+                    onInsert={insertRecipePhrase}
                   onSelect={(id) => { setSelectedPhraseId(id); setInspectorTab("recipe");  }}
                   />
                 ))
@@ -411,19 +417,19 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
         </PanelBody>
       </Panel>
 
-      <Panel className="grid-rows-[minmax(0,1fr)]">
+      <Panel className="col-start-2 row-start-2 grid-rows-[minmax(0,1fr)] max-[900px]:col-start-1 max-[900px]:row-start-auto">
 
         <PanelBody className="grid h-full min-h-0 overflow-hidden">
           <VegetationBabylonPreview asset={asset} grass={grass} primitiveMeshes={primitiveMeshes} selectedPhraseId={selectedPhraseId} />
         </PanelBody>
       </Panel>
 
-      <Panel as="aside">
+      <Panel as="aside" className="col-start-3 row-start-2 max-[900px]:col-start-1 max-[900px]:row-start-auto">
         <PanelHeader><h2 className="m-0 text-lg">Inspector</h2></PanelHeader>
         <PanelBody data-testid="asset-inspector-panel-body">
           <Stack>
             <div className="flex flex-wrap gap-1" role="tablist" aria-label="Inspector section">
-              {(["recipe", "materials", "primitives", "grass"] as const).map((tab) => <Button key={tab} role="tab" aria-selected={inspectorTab === tab} size="compact" tone={inspectorTab === tab ? "primary" : "default"} onClick={() => { setInspectorTab(tab);  }}>{tab === "recipe" ? "Recipe" : tab === "materials" ? "Colors" : tab === "primitives" ? "Meshes" : "Grass"}</Button>)}
+              {(["recipe", "materials", "primitives"] as const).map((tab) => <Button key={tab} role="tab" aria-selected={inspectorTab === tab} size="compact" tone={inspectorTab === tab ? "primary" : "default"} onClick={() => { setInspectorTab(tab);  }}>{tab === "recipe" ? "Recipe" : tab === "materials" ? "Colors" : tab === "primitives" ? "Meshes" : "Grass"}</Button>)}
             </div>
             {inspectorTab === "recipe" && (selectedPhrase ? (
               <>
@@ -431,8 +437,6 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
                   phrase={selectedPhrase}
                   materials={Object.keys(asset.species.materials)}
                   onChange={updateSelectedPhrase}
-                  onAddAfter={addAfterSelected}
-                  onAddInside={addInsideSelected}
                 />
               </>
             ) : (
@@ -451,25 +455,13 @@ export function AssetsPage({ onOpenMapEditor, onPlaytest }: Props) {
               onSelectVertex={setSelectedPrimitiveVertexIndex}
               onChange={(primitive) => replacePrimitive(primitive, false)}
             />}
-            {inspectorTab === "grass" && <>
-              <NumberField label="Patch width · metres" value={asset.editor?.preview?.groundPatchMeters ?? 4} step={0.5} min={1} max={8} onChange={groundPatchMeters => updateAsset(current => ({ ...current, editor: { ...current.editor, preview: { ...current.editor?.preview, groundPatchMeters } } }))} />
-              <NumberField label="Population seed" value={asset.editor?.preview?.populationSeed ?? 1} step={1} min={0} max={4294967295} onChange={populationSeed => updateAsset(current => ({ ...current, editor: { ...current.editor, preview: { ...current.editor?.preview, populationSeed } } }))} />
-              <ColorField label="Vegetation slat color" value={asset.species.lod.farColor ?? asset.species.materials[asset.species.parts[0].materialId].baseColor} onChange={farColor => updateAsset(current => ({ ...current, species: { ...current.species, lod: { ...current.species.lod, farColor } } }))} />
-              <NumberField label="Vegetation slat strength" value={asset.species.lod.farStrength ?? 0.5} step={0.05} min={0} max={1} onChange={farStrength => updateAsset(current => ({ ...current, species: { ...current.species, lod: { ...current.species.lod, farStrength } } }))} />
-              <GrassLodEditor grass={grass} onChange={updateGrass} />
-            </>}
-            <ActionRow>
-              <FileButton accept=".json,.lamow-vegetation.json,application/json" size="compact" onFile={(file) => file.text().then(loadJsonText)}><FileUp className="mr-1 h-4 w-4" /> Import</FileButton>
-              <Button type="button" size="compact" onClick={downloadJson}><Download className="mr-1 inline h-4 w-4" /> Export</Button>
-            </ActionRow>
+
             {message ? <div className="rounded-md bg-[var(--subtle-bg)] px-3 py-2 text-sm text-[var(--muted-text)]">{message}</div> : null}
-            <details className="rounded-md border border-[var(--surface-border)] p-3">
-              <summary className="cursor-pointer text-sm font-bold text-[var(--muted-text)]">Raw asset JSON</summary>
-              <textarea className="mt-3 min-h-48 w-full resize-none rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] p-2 font-mono text-xs text-[var(--app-text)]" spellCheck={false} readOnly value={exportText} />
-            </details>
           </Stack>
         </PanelBody>
       </Panel>
+      <Dialog open={Boolean(pendingImport)} title="Replace draft?" onOpenChange={next => { if (!next && !importBusy) setPendingImport(undefined); }}><div className="p-4"><ActionRow className="justify-end"><Button disabled={importBusy} onClick={() => setPendingImport(undefined)}>Cancel</Button><Button tone="danger" disabled={importBusy} onClick={() => { if (!pendingImport) return; setImportBusy(true); setImportError(""); void loadJsonText(pendingImport).catch(error => setImportError(error.message)).finally(() => setImportBusy(false)); }}>Import</Button></ActionRow>{importError && <div role="alert" className="mt-3 text-sm">{importError}</div>}</div></Dialog>
+      <Dialog open={removing} title="Remove draft?" onOpenChange={setRemoving}><ActionRow className="justify-end p-4"><Button onClick={() => setRemoving(false)}>Cancel</Button><Button tone="danger" onClick={() => { deleteSpecies(); setRemoving(false); }}>Remove</Button></ActionRow></Dialog>
     </main>
   );
 }
@@ -485,6 +477,7 @@ function PhraseTree({
   onDragStart,
   onDragEnd,
   onMove,
+  onInsert,
   onSelect,
 }: {
   phrase: GrowthPhrase;
@@ -497,6 +490,7 @@ function PhraseTree({
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onMove: (draggedId: string, targetId: string, position: PhraseDropPosition) => void;
+  onInsert: (targetId: string, position: PhraseDropPosition, phrase: GrowthPhrase) => void;
   onSelect: (id: string) => void;
 }) {
   const nested = phrase.type === "fork" ? phrase.continuation : phrase.type === "branch" ? phrase.offshoot : phrase.type === "choose" ? phrase.options.flatMap((option) => option.phrase) : [];
@@ -519,8 +513,10 @@ function PhraseTree({
   };
   return (
     <div className="grid gap-1">
-      <div
-        className={`relative grid min-h-8 grid-cols-[1.35rem_1rem_1.2rem_minmax(0,1fr)_auto] items-center gap-1 rounded-md border px-1.5 text-left text-sm ${selectedId === phrase.id ? "border-[var(--accent-border)] bg-[var(--accent-bg)] text-[var(--accent-text)]" : "border-[var(--panel-border)] bg-[var(--surface-bg)] text-[var(--app-text)]"} ${dragDisabled ? "opacity-55" : ""} ${rowDropClass}`}
+      <ContextMenuRoot><ContextMenuTrigger><div
+        onContextMenu={() => onSelect(phrase.id)}
+        data-testid={`phrase-row-${phrase.id}`} data-selected={selectedId === phrase.id}
+        className={`relative grid min-h-8 grid-cols-[1.35rem_1rem_1.2rem_minmax(0,1fr)_auto] items-center gap-1 rounded-md border px-1.5 text-left text-sm ${selectedId === phrase.id ? "border-[#2f6f34] bg-[#e4efdf] ring-1 ring-[#2f6f34] text-[var(--app-text)]" : "border-[var(--panel-border)] bg-[var(--surface-bg)] text-[var(--app-text)]"} ${dragDisabled ? "opacity-55" : ""} ${rowDropClass}`}
         style={{ marginLeft: depth * 18 }}
         draggable
         onDragStart={(event) => {
@@ -562,11 +558,16 @@ function PhraseTree({
           <GripVertical />
         </span>
         <PhraseIcon type={phrase.type} />
-        <button className="min-w-0 truncate py-1 text-left" type="button" onClick={() => onSelect(phrase.id)}>
+        <button className="min-w-0 truncate py-1 text-left" type="button" aria-pressed={selectedId === phrase.id} onClick={() => onSelect(phrase.id)}>
           {phrase.label}
         </button>
         <span className="text-xs uppercase text-[var(--muted-text)]">{phraseTypeLabel(phrase.type)}</span>
-      </div>
+      </div></ContextMenuTrigger><ContextMenuContent>
+        {(["before", "inside", "after"] as const).filter(position => position !== "inside" || canContainPhrasesForContext(phrase)).map(position => <ContextMenuSub key={position} trigger={<span className="flex justify-between gap-4">Add {position}<ChevronDown size={14} className="-rotate-90"/></span>}>
+          {[{ label: "Grow", factory: makeContinuePhrase }, { label: "Fork", factory: makeForkPhrase }, { label: "Branch", factory: makeBranchPhrase }, { label: "Form", factory: makeFormPhrase }].map(item => <ContextMenuItem key={item.label} onSelect={() => onInsert(phrase.id, position, item.factory())}>{item.label}</ContextMenuItem>)}
+        </ContextMenuSub>)}
+        <ContextMenuSeparator/><ContextMenuItem tone="danger" onSelect={() => onDelete(phrase.id)}>Delete</ContextMenuItem>
+      </ContextMenuContent></ContextMenuRoot>
       {nested.map((child) => (
         <PhraseTree
           key={child.id}
@@ -580,12 +581,15 @@ function PhraseTree({
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
           onMove={onMove}
+          onInsert={onInsert}
           onSelect={onSelect}
         />
       ))}
     </div>
   );
 }
+
+const canContainPhrasesForContext = (phrase: GrowthPhrase) => phrase.type === "fork" || phrase.type === "branch" || phrase.type === "choose";
 
 function PhraseIcon({ type }: { type: GrowthPhrase["type"] }) {
   if (type === "fork") return <Split className="h-4 w-4" />;
@@ -600,7 +604,7 @@ function phraseTypeLabel(type: GrowthPhrase["type"]) {
   return type;
 }
 
-function AddPhrasePalette({ materials, title = "Add root phrase", onAdd }: { materials: string[]; title?: string; onAdd: (phrase: GrowthPhrase) => void }) {
+function AddPhrasePalette({ materials, title = "Add", onAdd }: { materials: string[]; title?: string; onAdd: (phrase: GrowthPhrase) => void }) {
   const items = [
     { label: "Grow", factory: makeContinuePhrase, icon: <Sprout className="mr-1 h-4 w-4" /> },
     { label: "Fork", factory: makeForkPhrase, icon: <Split className="mr-1 h-4 w-4" /> },
@@ -800,15 +804,10 @@ function InlineTextField({ label, value, onChange }: { label: string; value: str
   );
 }
 
-function PhraseProperties({ phrase, materials, onChange, onAddAfter, onAddInside }: { phrase: GrowthPhrase; materials: string[]; onChange: (updater: (phrase: GrowthPhrase) => GrowthPhrase) => void; onAddAfter: (phrase: GrowthPhrase) => void; onAddInside: (phrase: GrowthPhrase) => void }) {
-  const canContainPhrases = phrase.type === "fork" || phrase.type === "branch" || phrase.type === "choose";
+function PhraseProperties({ phrase, materials, onChange }: { phrase: GrowthPhrase; materials: string[]; onChange: (updater: (phrase: GrowthPhrase) => GrowthPhrase) => void }) {
   return (
     <Stack>
       <TextField label="Label" value={phrase.label} onChange={(label) => onChange((current) => ({ ...current, label }))} />
-      <AddPhrasePalette materials={materials} title="Add after selected" onAdd={onAddAfter} />
-      {canContainPhrases ? (
-        <AddPhrasePalette materials={materials} title={`Add inside ${phraseTypeLabel(phrase.type)}`} onAdd={onAddInside} />
-      ) : null}
       {phrase.type === "continue" ? (
         <>
           {phrase.pathMode !== "arc" && <Button size="compact" onClick={() => onChange(current => current.type === "continue" ? { ...current, pathMode: "arc" } : current)}>Use curved growth</Button>}
@@ -860,11 +859,13 @@ function FormPhraseProperties({ phrase, materials, onChange }: { phrase: FormPhr
 function GrassLodEditor({ grass, onChange }: { grass: GrassLodSettings; onChange: (patch: Partial<GrassLodSettings>) => void }) {
   return (
     <Stack>
-      <h3 className="m-0 text-base">LOD / Slats</h3>
+
       <FormLabel>
-        Grass density {Math.round(grass.density * 100)}%
-        <input type="range" min={0.05} max={1} step={0.01} value={grass.density} onChange={(event) => onChange({ density: Number(event.currentTarget.value) })} />
+        Slat density {Math.round(grass.density * 100)}%
+        <input type="range" min={0.05} max={3} step={0.01} value={grass.density} onChange={(event) => onChange({ density: Number(event.currentTarget.value) })} />
       </FormLabel>
+      <SelectField label="Coverage pattern" value={grass.pattern ?? "stripes"} options={[{ value: "stripes", label: "Stripes" }, { value: "dots", label: "Dots" }]} onChange={pattern => onChange({ pattern: pattern as "stripes" | "dots" })}/>
+      <NumberField label="Pattern scale · metres" value={grass.patternScale ?? 0.8} min={0.1} max={10} step={0.1} onChange={patternScale => onChange({ patternScale })}/>
       <ColorField label="Slat second top" value={grass.topColorB} onChange={(topColorB) => onChange({ topColorB })} />
       <ColorField label="Slat middle" value={grass.midColor} onChange={(midColor) => onChange({ midColor })} />
       <ColorField label="Slat top" value={grass.topColorA} onChange={(topColorA) => onChange({ topColorA })} />
@@ -1036,8 +1037,8 @@ function VariationField({
   const idealMin = integer ? 1 : min;
   const deviationLimit = integer ? Math.max(0, Math.min(value.ideal, 64 - value.ideal)) : deviationMax;
   return (
-    <fieldset disabled={disabled} data-testid={`variation-${slugifyTestId(label)}`} className="grid min-w-0 grid-cols-[minmax(0,1fr)_6.25rem_6.25rem] items-end gap-1.5 disabled:opacity-40">
-      <div className="text-xs font-bold text-[var(--muted-text)]">{label}</div>
+    <fieldset disabled={disabled} data-testid={`variation-${slugifyTestId(label)}`} className="grid min-w-0 grid-cols-2 items-end gap-1.5 disabled:opacity-40">
+      <div className="col-span-2 text-xs font-bold text-[var(--muted-text)]">{label}</div>
       <NumberField label="Ideal" value={value.ideal} step={step} min={idealMin} max={idealMax} onChange={(ideal) => update({ ideal })} />
       <NumberField label="+/-" value={value.deviation} step={step} min={0} max={deviationLimit} onChange={(deviation) => update({ deviation })} />
     </fieldset>
@@ -1146,7 +1147,7 @@ function NumberField({ label, value, step, min, max, onChange, holdAcceleration 
   return (
     <FormLabel>
       {label}
-      <div className="grid h-8 grid-cols-[1.35rem_minmax(2.9rem,1fr)_1.35rem] overflow-hidden rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] transition focus-within:border-[#2f6f34] focus-within:shadow-[0_0_0_2px_rgb(47_111_52_/_18%)]">
+      <div className="grid h-8 grid-cols-[1.35rem_minmax(2.9rem,1fr)_1.35rem] overflow-hidden rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] transition duration-75 focus-within:border-[#2f6f34] focus-within:shadow-[0_0_0_2px_rgb(47_111_52_/_18%)]">
         <button
           aria-label={`Decrease ${label}`}
           className="select-none border-r border-[var(--input-border)] text-[11px] font-bold leading-none text-[var(--muted-text)] outline-none hover:bg-[var(--hover-bg)] focus-visible:bg-[var(--subtle-bg)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
@@ -1162,7 +1163,8 @@ function NumberField({ label, value, step, min, max, onChange, holdAcceleration 
           -
         </button>
         <input
-          className="min-w-0 bg-transparent px-1 text-center text-[12px] tabular-nums text-[var(--app-text)] outline-none"
+          className="min-w-0 bg-transparent px-1 text-right font-mono text-[12px] tabular-nums text-[var(--app-text)] outline-none"
+          style={{ paddingRight: "calc(0.25rem + " + numberFractionPadding(draft, step) + "ch)" }}
           inputMode="decimal"
           value={draft}
           onFocus={() => { editingRef.current = true; }}

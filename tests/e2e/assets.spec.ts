@@ -36,6 +36,7 @@ test("asset editor opens a controllable Babylon preview", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Side", exact: true }).click();
   const angles = (await previewState(page)).camera.slice(0, 2);
   await page.getByRole("button", { name: "Reset Plant view", exact: true }).click();
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
   expect((await previewState(page)).camera.slice(0, 2)).toEqual(angles);
   for (const id of ["half", "full", "lod-half", "lod-full"]) await expect(page.getByTestId("preview-" + id)).toBeVisible();
 

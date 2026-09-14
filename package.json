@@ -4,14 +4,15 @@
   "description": "",
   "scripts": {
     "dev": "pnpm build:renderer && vite --host 127.0.0.1 --port 5191",
-    "dev:e2e": "pnpm build:renderer && vite --host 127.0.0.1 --port 5192 --strictPort",
+    "dev:e2e": "pnpm build:renderer && vite --mode e2e --host 127.0.0.1 --port 5192 --strictPort",
     "build:renderer": "pnpm --filter @lamow/landscape-renderer build",
     "build": "pnpm build:renderer && tsc && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5191",
-    "test": "pnpm build:renderer && vite build --ssr tests/domain.test.ts --outDir .tmp/domain-tests --emptyOutDir && node --test .tmp/domain-tests/domain.test.js && node --test tests/vegetation-runtime.test.mjs",
+    "test": "pnpm build:renderer && vite build --ssr tests/domain.test.ts --outDir .tmp/domain-tests --emptyOutDir && node --test .tmp/domain-tests/domain.test.js && node --test tests/vegetation-runtime.test.mjs tests/vegetation-library.test.mjs",
     "test:e2e": "pnpm build:renderer && playwright test",
     "test:e2e:headed": "pnpm build:renderer && playwright test --headed",
-    "test:e2e:debug": "pnpm build:renderer && playwright test --headed --debug"
+    "test:e2e:debug": "pnpm build:renderer && playwright test --headed --debug",
+    "sync:game-assets": "node scripts/sync-game-assets.mjs"
   },
   "packageManager": "pnpm@11.1.3",
   "keywords": [],
