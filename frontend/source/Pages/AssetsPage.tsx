@@ -746,7 +746,7 @@ function formDimensionLimits(primitive: FormPhrase["primitive"]) {
 }
 
 function formSupportsCup(primitive: FormPhrase["primitive"]) {
-  return primitive === "saddlePetal";
+  return primitive === "saddlePetal" || primitive === "leafBlade";
 }
 
 function formSupportsCurl(primitive: FormPhrase["primitive"]) {

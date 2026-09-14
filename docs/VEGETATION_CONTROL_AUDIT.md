@@ -1,5 +1,52 @@
 # Vegetation editor corrective pass
 
+## September 14: measured modifier ranges
+
+The current control-by-control contract is [Vegetation modifiers](VEGETATION_MODIFIERS.md).
+Run `pnpm audit:modifiers` to generate a searchable HTML report and raw JSON in
+`.tmp/modifier-audit/`. The assertions also run in the normal test suite.
+
+The baseline measured 10,687 cases with **66 failures**: 64 legacy angle cases were
+clipped at ±180°, plus two statistical range failures. For distance `0 ± 0.8 m`,
+the exact 16 seeds used by the preview produced −0.422291…−0.412990 m: only **0.58%**
+of the requested interval, all negative. After mixing the random draws, the same
+pool spans −0.781272…+0.677818 m (**91.19%**); 4,096 consecutive seeds span **99.96%**.
+The 16-bin histogram now ranges from 238 to 290 samples per bin (256 expected).
+
+Final verification: **10,689 measured cases across 65 groups, zero failures**; 45 core
+tests pass, including that bench. Seven browser scenarios pass, including three new
+tests that type values and compare live vertex buffers to analytical coordinates.
+Production build passes. Warm five-view CPU updates measured **4.3–6.0 ms** at default
+coverage and **5.0–7.8 ms** with 1,008 full-density plants; these are not GPU frame times
+or total input latency. The HTML report's filtering, plots and case table were checked
+in Chromium and visually inspected.
+
+Corrections:
+
+- Mix adjacent random seeds before use; retain the 16-variant geometry pool.
+- Preserve sampled legacy angles beyond ±180° rather than clipping them.
+- Use separate mixed random draws for patch scale and yaw. Previously both shared
+  the same biased value, tying size to orientation.
+- Expose leaf Cup, which was already changing leaf geometry but had no visible control.
+- Ignore deprecated side bias when Around axis is specified, including its random draw.
+
+The bench checks continuous/legacy travel, path cross-sections, every Form dimension
+and supported deformation, all Fork/Branch layouts, copy counts, imported Steer axes,
+defaults, material routing, budgets, coverage, serialization, finite normals, and actual
+patch transform buffers. It includes signed Ideal endpoints, zero, maximum ± at negative,
+zero and positive ideals, and fixed consecutive seeds. Independent expected geometry
+uses a calibration tetrahedron and every rendered vertex of the shipped Form sources.
+
+Some surprising behavior is documented rather than redesigned: Form Width is a source
+multiplier (the shipped leaf is 0.48 × Width), branch tilt acts on different forward axes
+for leaves and growth, and radial spacing jumps near a full turn. These are visible
+design tradeoffs, not a claim that the whole experience is now beyond review.
+
+Saved inputs/versions are unchanged; seeded geometry can look different after these
+renderer corrections. The report measures geometry, not all possible compositions,
+self-intersections, GPU pixels or game-side LOD transitions. Historical entries below
+describe earlier milestones and may have been superseded.
+
 ## September 10: signed values and smooth holds
 
 Grow arc and branch deviation angles now accept -180° to 180°. Azimuth and fork spread

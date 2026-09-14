@@ -35,6 +35,7 @@ rebuild when source changes. Stop the development server before starting preview
 | `pnpm preview` | Serves the last production build. Run `pnpm build` first. |
 | `pnpm test` | Builds the renderer and runs domain, rendering, and version-storage tests. |
 | `pnpm test:e2e` | Runs browser workflows on port 5192 with a separate profile and test library. |
+| `pnpm audit:modifiers` | Measures modifier ranges against independent geometry calculations; open `.tmp/modifier-audit/index.html` for plots and individual results. |
 
 If browser tests report a missing Chromium installation, run `pnpm exec playwright install chromium`.
 The renderer is compiled once when `dev` starts; after editing its source, run
@@ -137,6 +138,7 @@ a TypeScript file that is not the current normal game loading path.
   and the eventual game integration path.
 - [Renderer API](packages/landscape-renderer/docs/editor-integration.md) — embedding in a host.
 - [Geometry contract](docs/VEGETATION_PROCEDURAL_GEOMETRY.md) — transforms and signed randomness.
+- [Modifier reference](docs/VEGETATION_MODIFIERS.md) — each control's range, units, effect, expected no-ops, and known quirks.
 - [Control verification](docs/VEGETATION_CONTROL_AUDIT.md) — prior fixes and measured limits.
 
 Older root contracts and planning notes document earlier formats and decisions; this README

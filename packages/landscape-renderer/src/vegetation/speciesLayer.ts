@@ -1,6 +1,7 @@
 import { Color3, Matrix, Mesh, Quaternion, StandardMaterial, Vector3, VertexData, type Scene, type TransformNode } from "@babylonjs/core";
 import type { VegetationSpeciesAssetFile } from "./assets.js";
 import { compileVegetationPlant, type CompiledPlantPart } from "./recipe.js";
+import { createVegetationRandom } from "./random.js";
 
 export type VegetationPlacement = { x: number; z: number; seed: number; yaw?: number; scale?: number };
 export type VegetationGeometryCache = { signature?: string; plants: Map<number, CompiledPlantPart[]> };
@@ -117,9 +118,10 @@ export function createVegetationSpeciesLayer(input: {
           const source = new Float32Array(plantIndices.length * 16);
           plantIndices.forEach((index, i) => {
             const plant = plants[index];
-            const unit = ((Math.imul(plant.seed >>> 0, 1664525) + 1013904223) >>> 0) / 4294967296;
-            const scale = plant.scale ?? asset.species.instanceRanges.scale.min + unit * (asset.species.instanceRanges.scale.max - asset.species.instanceRanges.scale.min);
-            const yaw = plant.yaw ?? asset.species.instanceRanges.yaw.min + unit * (asset.species.instanceRanges.yaw.max - asset.species.instanceRanges.yaw.min);
+            const random = createVegetationRandom(plant.seed);
+            const scaleUnit = random(), yawUnit = random();
+            const scale = plant.scale ?? asset.species.instanceRanges.scale.min + scaleUnit * (asset.species.instanceRanges.scale.max - asset.species.instanceRanges.scale.min);
+            const yaw = plant.yaw ?? asset.species.instanceRanges.yaw.min + yawUnit * (asset.species.instanceRanges.yaw.max - asset.species.instanceRanges.yaw.min);
             Matrix.Compose(new Vector3(scale, scale, scale), Quaternion.RotationYawPitchRoll(yaw, 0, 0), new Vector3(plant.x, input.groundHeightAt(plant.x, plant.z), plant.z)).copyToArray(source, i * 16);
           });
           batch.source = source; batch.buffer = source.slice(); batch.plantIndices = plantIndices;

@@ -137,7 +137,7 @@ test("vegetation recipe controls use sane ranges and update the Babylon preview 
   await expect(page.getByTestId("variation-around-axis")).toBeVisible();
 
   await page.getByRole("button", { name: "Form leaf blade" }).first().click();
-  await expect(page.getByTestId("variation-cup")).toHaveCount(0);
+  await expect(page.getByTestId("variation-cup")).toBeVisible();
   await expect(page.getByTestId("variation-curl")).toBeVisible();
   await expect(page.getByTestId("variation-length")).toBeVisible();
   await expect(page.getByTestId("variation-width")).toBeVisible();

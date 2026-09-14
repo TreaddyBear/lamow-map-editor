@@ -3,8 +3,13 @@ import { fieldFlowerShapeToRecipe, cloverClusterShapeToRecipe, type GrowthPhrase
 import { defaultObjPrimitiveLibrary, objPrimitiveToRenderData, type ObjPrimitiveMesh } from "./objPrimitives.js";
 import { degreesToRadians, stemGrowthVector, stemOrientationQuaternion } from "./geometry.js";
 import { growthArcPose, subdivideGrowthSource } from "./growthPath.js";
+import { createVegetationRandom } from "./random.js";
 
 export type CompiledPlantPart = { phraseId: string; materialId: string; positions: number[]; indices: number[]; colors: number[] };
+/** Optional measuring hook for the modifier bench; normal rendering allocates no trace records. */
+export type VegetationCompileOptions = {
+  onSample?: (sample: { phraseId: string; field: string; ideal: number; deviation: number; value: number }) => void;
+};
 type Cursor = { position: Vector3; rotation: Quaternion; scale: number; materialId: string; lastRoot: Vector3; lastPath?: (t: number) => { position: Vector3; rotation: Quaternion } };
 const copyCursor = (cursor: Cursor): Cursor => ({ ...cursor, position: cursor.position.clone(), rotation: cursor.rotation.clone(), lastRoot: cursor.lastRoot.clone() });
 const orientedIndices = (indices: number[], mirrored: boolean) => {
@@ -15,16 +20,20 @@ const orientedIndices = (indices: number[], mirrored: boolean) => {
 };
 
 /** Pure seeded construction: no scene, DOM, camera, or gameplay dependencies. */
-export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed = 1, primitives: ObjPrimitiveMesh[] = asset.primitives ?? defaultObjPrimitiveLibrary()): CompiledPlantPart[] {
+export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed = 1, primitives: ObjPrimitiveMesh[] = asset.primitives ?? defaultObjPrimitiveLibrary(), options?: VegetationCompileOptions): CompiledPlantPart[] {
   const shape = asset.species.parts[0].shape;
   const recipe = asset.species.constructionRecipe ?? (shape.type === "fieldFlower"
     ? fieldFlowerShapeToRecipe(shape, asset.species.parts[0].materialId)
     : shape.type === "cloverCluster" ? cloverClusterShapeToRecipe(shape, asset.species.parts[0].materialId) : undefined);
   if (!recipe) throw new Error(`Shared recipe rendering does not yet support ${shape.type}.`);
-  let state = seed >>> 0;
-  const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
-  const sample = (value: IdealVariation | undefined, fallback = 0) => value ? value.ideal + (random() * 2 - 1) * value.deviation : fallback;
-  const count = (value: IdealVariation) => Math.max(0, Math.min(64, Math.round(sample(value))));
+  const random = createVegetationRandom(seed);
+  let phraseId = "";
+  const sample = (field: string, value: IdealVariation | undefined, fallback = 0) => {
+    const result = value ? value.ideal + (random() * 2 - 1) * value.deviation : fallback;
+    if (options?.onSample) options.onSample({ phraseId, field, ideal: value?.ideal ?? fallback, deviation: value?.deviation ?? 0, value: result });
+    return result;
+  };
+  const count = (value: IdealVariation) => Math.max(0, Math.min(64, Math.round(sample("count", value))));
   const parts: CompiledPlantPart[] = [];
   const sourceData = new Map(primitives.map((primitive) => [primitive.id, objPrimitiveToRenderData(primitive)]));
   let steps = 0;
@@ -55,15 +64,16 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
   const walk = (phrases: GrowthPhrase[], cursor: Cursor, depth: number) => {
     if (depth > 16) throw new Error("Recipe nesting exceeds 16 levels.");
     for (const phrase of phrases) {
+      phraseId = phrase.id;
       if (++steps > 8192) throw new Error("Recipe exceeds the construction budget.");
       if (phrase.type === "continue") {
-        const distance = sample(phrase.distance);
-        const arc = sample(phrase.arcDegrees), azimuth = sample(phrase.arcAzimuthDegrees);
+        const distance = sample("distance", phrase.distance);
+        const arc = sample("arcDegrees", phrase.arcDegrees), azimuth = sample("arcAzimuthDegrees", phrase.arcAzimuthDegrees);
         const local = stemGrowthVector(distance, arc, azimuth);
         // Signed travel reverses displacement without also reversing the frame.
         const nextRotation = cursor.rotation.multiply(stemOrientationQuaternion(distance === 0 ? Vector3.Zero() : stemGrowthVector(1, arc, azimuth)));
-        const radius = sample(phrase.radiusStart, 0.01);
-        const endRadius = sample(phrase.radiusEnd, 0.006);
+        const radius = sample("radiusStart", phrase.radiusStart, 0.01);
+        const endRadius = sample("radiusEnd", phrase.radiusEnd, 0.006);
         if (phrase.pathMode === "arc") {
           const root = copyCursor(cursor);
           const path = (t: number) => { const pose = growthArcPose(distance, arc, azimuth, t); return { position: root.position.add(rotate(root, pose.position).scale(root.scale)), rotation: root.rotation.multiply(pose.rotation) }; };
@@ -86,26 +96,26 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
         cursor.lastPath = undefined;
         if (phrase.formAlongPath && phrase.formAlongPath !== "none") {
           emit(phrase.id, phrase.formAlongPath === "blade" ? "quadSlat" : "stemSkin", cursor.materialId,
-            { ...cursor, rotation: nextRotation }, new Vector3(radius * 2, distance, radius * 2), 0, 0, endRadius * 2, sample(phrase.bend));
+            { ...cursor, rotation: nextRotation }, new Vector3(radius * 2, distance, radius * 2), 0, 0, endRadius * 2, sample("bend", phrase.bend));
         }
         cursor.lastRoot = cursor.position.clone();
         cursor.position.addInPlace(rotate(cursor, local).scale(cursor.scale));
         cursor.rotation = nextRotation;
       } else if (phrase.type === "steer") {
-        cursor.rotation = cursor.rotation.multiply(Quaternion.RotationYawPitchRoll(degreesToRadians(sample(phrase.yawDegrees)), degreesToRadians(sample(phrase.pitchDegrees)), degreesToRadians(sample(phrase.rollDegrees))));
-        cursor.scale *= sample(phrase.scale, 1);
+        cursor.rotation = cursor.rotation.multiply(Quaternion.RotationYawPitchRoll(degreesToRadians(sample("yawDegrees", phrase.yawDegrees)), degreesToRadians(sample("pitchDegrees", phrase.pitchDegrees)), degreesToRadians(sample("rollDegrees", phrase.rollDegrees))));
+        cursor.scale *= sample("scale", phrase.scale, 1);
       } else if (phrase.type === "color") {
         cursor.materialId = phrase.materialId;
       } else if (phrase.type === "form") {
-        const width = sample(phrase.width, phrase.primitive === "centerDisc" ? 0.05 : 0.04);
-        const length = sample(phrase.length, phrase.primitive === "centerDisc" ? width * 0.62 : 0.09);
+        const width = sample("width", phrase.width, phrase.primitive === "centerDisc" ? 0.05 : 0.04);
+        const length = sample("length", phrase.length, phrase.primitive === "centerDisc" ? width * 0.62 : 0.09);
         const scale = phrase.primitive === "centerDisc" || phrase.primitive === "stemSkin" || phrase.primitive === "quadSlat"
           ? new Vector3(width, length, width) : new Vector3(width, length, length);
-        emit(phrase.id, phrase.primitive, phrase.materialId, cursor, scale, sample(phrase.cup), sample(phrase.curl));
+        emit(phrase.id, phrase.primitive, phrase.materialId, cursor, scale, sample("cup", phrase.cup), sample("curl", phrase.curl));
       } else if (phrase.type === "fork") {
         const total = count(phrase.count);
-        const spread = degreesToRadians(sample(phrase.spreadDegrees, 360));
-        const radius = sample(phrase.radius) * cursor.scale;
+        const spread = degreesToRadians(sample("spreadDegrees", phrase.spreadDegrees, 360));
+        const radius = sample("radius", phrase.radius) * cursor.scale;
         for (let i = 0; i < total; i++) {
           const child = copyCursor(cursor);
           const theta = phrase.layout === "sameAxis" ? 0 : phrase.layout === "cluster" ? random() * spread
@@ -123,9 +133,10 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
           const attachment = cursor.lastPath?.(t);
           child.position = attachment?.position ?? Vector3.Lerp(cursor.lastRoot, cursor.position, t);
           if (attachment) child.rotation = attachment.rotation;
-          const around = degreesToRadians(sample(phrase.aroundAxisDegrees, sample(phrase.sideBiasDegrees)));
+          phraseId = phrase.id;
+          const around = degreesToRadians(sample("aroundAxisDegrees", phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees));
           const theta = around + (phrase.layout === "alternating" ? i * Math.PI : i * Math.PI * 2 / Math.max(1, total));
-          child.rotation = child.rotation.multiply(Quaternion.RotationYawPitchRoll(theta, -degreesToRadians(sample(phrase.deviationDegrees ?? { ideal: 55, deviation: 8 })), 0));
+          child.rotation = child.rotation.multiply(Quaternion.RotationYawPitchRoll(theta, -degreesToRadians(sample("deviationDegrees", phrase.deviationDegrees ?? { ideal: 55, deviation: 8 })), 0));
           walk(phrase.offshoot, child, depth + 1);
         }
       } else if (phrase.type === "choose") {

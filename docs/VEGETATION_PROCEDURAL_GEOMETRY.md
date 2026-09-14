@@ -44,7 +44,7 @@ apply to the continuous path. Imports never silently change this choice.
 A growth segment with length `height`, deviation `arcDegrees`, and `arcAzimuthDegrees` produces:
 
 ```txt
-arc = radians(clamp(arcDegrees, -180, 180))
+arc = radians(arcDegrees)
 azimuth = radians(arcAzimuthDegrees)
 radial = sin(arc) * height
 growthVector = [
@@ -59,6 +59,13 @@ So:
 - `arcDegrees = 0` grows straight up: `[0, height, 0]`.
 - `arcDegrees = 90`, `azimuth = 0` grows along `+X`.
 - `arcDegrees = 90`, `azimuth = 90` grows along `+Z`.
+
+Random samples beyond ±180° retain their full turn; the old clamp was removed on
+September 14 after the modifier bench caught collapsed endpoints at the limits.
+This is still a straight direction vector, not the continuous-arc path above.
+
+The complete [modifier reference](VEGETATION_MODIFIERS.md) covers source-mesh scaling,
+branch axes, each layout, random sampling, and expected no-op controls.
 
 ## Petal Fork Placement
 

@@ -21,7 +21,9 @@ export function degreesToRadians(value: number) {
 }
 
 export function stemGrowthVector(height: number, arcDegrees: number, arcAzimuthDegrees: number) {
-  const arc = degreesToRadians(clamp(arcDegrees, -180, 180));
+  // An ideal of 180° with ±180° variation can legitimately sample 360°.
+  // Trigonometry handles those turns; clamping created a pile-up at ±180°.
+  const arc = degreesToRadians(arcDegrees);
   const azimuth = degreesToRadians(arcAzimuthDegrees);
   const radial = Math.sin(arc) * height;
   return new Vector3(Math.cos(azimuth) * radial, Math.cos(arc) * height, Math.sin(azimuth) * radial);
