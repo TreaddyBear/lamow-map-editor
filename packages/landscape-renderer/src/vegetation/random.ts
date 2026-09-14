@@ -11,3 +11,12 @@ export function createVegetationRandom(seed: number) {
     return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/** A field keeps its draw when unrelated fields/components are inserted or edited.
+ * Component IDs survive saving/duplication; instance paths distinguish repeated children.
+ */
+export function vegetationFieldRandom(seed: number, key: string) {
+  let hash = (seed >>> 0) ^ 2166136261;
+  for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 16777619);
+  return createVegetationRandom(hash)();
+}

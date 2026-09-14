@@ -1,5 +1,64 @@
 # Vegetation editor corrective pass
 
+## September 14 composition audit: stability before refining assets
+
+This pass tests meaning across components and editing workflows, in addition to
+individual ranges. The first 27 behavioral scenarios reproduced **22 failing cases**
+(several cases share a cause). Corrections now cover:
+
+| Failure | Result after correction |
+| --- | --- |
+| Adding a zero Cup/Curl, an empty Fork, or an independent Form rerolled unrelated shapes | Stable per-component, per-field, per-copy randomness preserves those shapes. |
+| Nested Branch reused an ancestor's path, losing Fork radius or its parent's attachment | Children start at their own attachment; only their own Grow supplies a new path. |
+| Steer after curved Grow was ignored by the next Branch | Local steering carries into the attachment frame. |
+| Radial spread jumped near 360° | One spacing formula applies throughout positive and negative sectors. |
+| Invalid layouts, skin types, colors, density, preview values, and component identity silently passed import | These fail validation before being saved. |
+| Blank numeric input committed zero; Escape did not cancel; a typed value was ignored before an arrow nudge | Blank/Escape retain the value; arrow keys commit then nudge. Invalid color text reverts. |
+| Rejected geometry edits could still change materials and poison subsequent population edits | Compilation failures preserve the prior visible geometry/materials and restore the active asset. |
+| Legal flat-shaded OBJ sources could exceed JavaScript's argument limit | A 45,000-render-vertex fixture renders and recovers after rejected oversized copies. |
+| Individually valid scales could compose into GPU infinities | Unrepresentable output coordinates fail cleanly. Vertex/tessellation budgets also bound expansion. |
+| 99% dot coverage filled only about 90% of its cell | Radius accounts for cell clipping; the production GPU mask matches coverage within 0.4 percentage points in the 256² test. |
+
+The measuring bench now includes **128 combined recipes** (all phrase types,
+signed growth, all layouts, random angles, weighted choices), checking export/reimport,
+input immutability, finite/index-valid output and inherited scale. Choice frequencies
+are measured over 4,096 seeds. Browser checks exercise actual controls and live
+buffers; the LOD test compiles the production mask shader and counts its pixels.
+
+Each of the 15 builder quantities also has a direct output-deviance check over
+2,048 seeds: Width, Length, Cup, Curl, Distance, Arc degrees, Arc direction, both
+path radii, Fork radius/spread/count, and Branch around-axis/tilt/count. Values are
+recovered from generated coordinates or actual copy counts, without reading the
+compiler's sampled inputs. All continuous controls covered **99.79–99.99%** of their
+requested intervals; all count outputs 16–48 occurred for `32 ±16`. Bounds, means,
+and distribution checks pass. Count endpoints correctly have half-width rounding
+intervals. Signed/zero/maximum-Ideal and maximum-deviance combinations remain in the
+larger analytical range sweeps for every primitive and layout.
+
+Verification: **10,907 measuring cases, zero failures; 47 core tests**. All 35 browser
+scenarios pass across the full run and targeted reruns after corrections. Warm five-view
+CPU updates measured 4.2–9.7 ms at default coverage and 5.1–6.9 ms with 1,008 full-density
+plants; idle rendering stops. These are update times, not total input latency/GPU frames.
+The reruns also verify old unmarked versions recover as clean and preserve disk history.
+
+**Protecting refined assets:** `generationVersion: 1` names this corrected behavior.
+Unmarked older files use version 1; reading them does not rewrite files. Forty-eight
+committed output fingerprints cover the starter flower, authored clover fixture and
+a nested recipe across the entire 16-variant pool. Future semantic changes must keep
+version 1 available and introduce an explicit new generation version/conversion,
+rather than quietly refreshing expected output. These corrections can change older
+seeded appearances once; saved parameters and user version files remain untouched.
+
+Remaining boundaries are explicit in the [modifier reference](VEGETATION_MODIFIERS.md):
+`fromForm` attachment is unavailable, imported Steer/Choose/Color lack full authoring
+inspectors, Form dimensions are source multipliers, and 16 shape variants do not cover
+every random extreme. Self-intersection at extreme settings and perceived transitions
+between near geometry and distant slats are not certified by these tests. The main
+game still needs the shared-renderer integration described in the interface audit.
+
+The historical results below describe earlier checkpoints and are superseded where
+this section or the current modifier reference specifies corrected behavior.
+
 ## September 14 follow-up: does the randomness make visual sense?
 
 Added 45 angular scenarios, measuring actual compass headings rather than merely

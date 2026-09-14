@@ -2,6 +2,13 @@
 
 This editor uses one explicit transform contract for generated vegetation. The game runtime should use the same contract for any matching procedural asset path.
 
+The current contract is `generationVersion: 1` (also the interpretation of older
+unmarked assets). Component randomness uses stable component/field/copy keys, not
+execution order. Fork and Branch children own their attachment paths; they never
+reuse an ancestor's path implicitly. Radial Fork spacing is `i * spread / count`
+for all spreads, including full turns. See the [modifier reference](VEGETATION_MODIFIERS.md)
+for the complete current semantics and compatibility rules.
+
 ## Coordinate Basis
 
 - World axes are `+X` right, `+Y` up, and `+Z` forward.

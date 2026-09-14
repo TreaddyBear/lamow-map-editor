@@ -72,22 +72,24 @@ For copy index `i` starting at 0, copy count `n`, and sampled spread `s`:
 
 | Layout | Placement angle / consequence |
 | --- | --- |
-| radial | At ±360°, angle is `i × s / n`, avoiding a duplicate endpoint. Otherwise it is `i × s / max(1,n−1)`, including both ends of the spread. |
+| radial | Angle is always `i × s / n`. The sector includes its start and excludes its end, so full turns have no duplicate endpoint and small spread changes remain smooth. |
 | spiral | `i × 137.507764° × (s / 360°)`. Spread scales the golden-angle spacing; it is **not** the total occupied angle. |
 | mirrored | Alternates negative/positive angles at increasing distances from the centre, up to approximately half the spread. With an odd count the sides are not perfectly balanced. |
 | cluster | Each copy gets an independent angle between 0 and `s`. This is a randomized ring sector, **not** a filled disk; all copies share the sampled radius. |
 | sameAxis | Every angle is 0. Copies share position and orientation, though their child deviations can differ. Identical children overlap completely. Spread is disabled. |
 
-**Existing discontinuity:** radial spacing changes abruptly near exactly ±360°
-(within about 0.057°) because of the duplicate-endpoint rule. Thus 359° is not nearly
-the same arrangement as 360°. This audit verifies and records that existing behavior;
-it does not redesign it. Random spread crossing that seam can visibly rearrange a fork.
+The September 14 composition pass removes the old spacing jump near ±360°.
+Partial radial sectors now use the same spacing rule as full turns; existing partial
+fans can consequently look different. Negative spread reverses the ordering.
 
 ## Branch
 
 Branch places child recipes along the **most recent Grow path**, using that path's
 orientation at each attachment. With no preceding Grow, attachments coincide at the
-current origin. Branch does not move the parent's cursor.
+current origin. Branch does not move the parent's cursor. A Fork or Branch child starts
+at its own attachment and does **not** inherit an ancestor's attachment path. A Grow
+inside that child establishes a new local path. Steer after Grow rotates subsequent
+Branch orientations relative to the path frame without moving attachment positions.
 
 | Control | Ideal input / maximum ± / button step | Actual effect |
 | --- | --- | --- |
@@ -145,9 +147,11 @@ sample. Cup/Curl default to zero. Creation defaults can differ from these import
 
 ## Randomness, previews, and limits
 
-- Recipe execution is deterministic for the same asset, seed, and renderer version.
-  Draws follow recipe execution order. Adding/reordering components or adding optional
-  numeric fields can change later draws. This is not a stable per-component random stream.
+- Recipe execution is deterministic for the same asset, seed, and generation version.
+  Draws are keyed by component ID, field, and parent copy path. Adding neutral optional
+  fields or inserting/reordering independent Forms does not reroll existing shapes.
+  Moving a component into a different parent or changing its ID changes its draws.
+  Structural edits can still intentionally change the inherited position or orientation.
 - A Fork's count/spread/radius are sampled once per Fork execution. Each child then
   samples its own controls. Branch samples its tilt/around-axis separately per child.
 - Continuous ranges are uniform before transforms. Rounded counts are **not** uniformly
@@ -157,11 +161,17 @@ sample. Cup/Curl default to zero. Creation defaults can differ from these import
   same shape; it can still change placement rotation/scale. A small pool does not show
   every possible extreme. Patch scale/yaw are separate random draws, with explicit
   placement overrides taking precedence.
-- September 14 corrects random mixing and legacy angle clipping. **Saved parameters
-  and versions are untouched, but their seeded appearance can change with this renderer.**
-  Versions are input snapshots, not frozen meshes or pinned renderer binaries.
+- September 14 corrects random mixing, attachment scope, and radial spacing. **Saved
+  parameters and versions are untouched, but their appearance can change once with
+  these corrections.** New parsed/exported assets carry `generationVersion: 1`; older
+  unmarked assets use version 1 without rewriting their files. This version's geometry
+  is protected by 48 committed output fingerprints plus analytical/behavior tests.
+  A future intentional semantic change must preserve version 1 and introduce an explicit
+  new generation version/conversion; do not silently replace the fingerprints.
+  Asset versions remain input snapshots, not frozen meshes or renderer binaries.
 - Limits: 64 copies per Fork/Branch, 2,048 emitted Forms per plant, 8,192 execution
-  steps, and 16 nested levels. Individually valid controls can exceed a combined budget;
+  steps, 131,072 rendered vertices per plant, and 16 nested levels. Curved source
+  subdivision also has a preflight tessellation budget. Individually valid controls can exceed a combined budget;
   compilation rejects the draft rather than generating invalid geometry.
 - Imported scalar ranges may exceed the UI editing limits, up to the parser's finite
   magnitude budget (`abs(Ideal) + ± ≤ 10,000`). Focusing/blurring an unchanged value
@@ -176,16 +186,18 @@ sample. Cup/Curl default to zero. Creation defaults can differ from these import
 | Seed | 0…4,294,967,295 integer | Deterministic placement/variant selection; repetition of shape is expected with 16 variants. |
 | Population → Plant rotation | Ideal −360…360°; ±0…180°; step 1° | Rotates the whole plant about its base. Any direction selects a full random turn. Actual 4,096-flower populations are checked for compass coverage after applying instance transforms. |
 | Slat density | 0.05…3, step 0.01 | Multiplies distant slat geometry density. Independent of near-plant coverage calibration. Existing browser tests check buffer changes; this bench does not certify perceived LOD equivalence. |
-| Coverage pattern / scale | stripes or dots; 0.1…10 m, step 0.1 | Opaque grass/vegetation surface selection. Scale changes the spatial pattern size, not opacity. |
+| Coverage pattern / scale | stripes or dots; 0.1…10 m, step 0.1 | Opaque grass/vegetation surface selection. Scale changes pattern size, not opacity. GPU mask measurements verify requested area within 0.4 percentage points at 256² resolution, including high-density dots. |
 | Slat palette / vegetation far color | RGB hex; far-color strength 0…1, step 0.05 | Changes distant appearance. Material/vertex color, lighting and the pattern affect the displayed pixel. No colorimetric/GPU proof is claimed here. |
 | Mesh vertex X/Y/Z | −2…2 source units, step 0.005 | Changes the source before recipe deformation/scale. Source imports allow a wider validated range. Source color multiplies material color; seams split normals rather than moving vertices. |
 | Imported Steer | yaw/pitch/roll in degrees; signed uniform Scale | Local roll, then pitch, then yaw; scale multiplies all downstream dimensions/travel. Bench checks axes and signs. No current recipe inspector. |
 | Imported Color | material ID | Changes subsequent Grow skin material; Form has its own explicit material. Bench checks this distinction. |
-| Imported Choose | nonnegative weights | Executes one weighted child recipe, mutating the current cursor. All-zero weights execute none. Bench checks zero/one-option routing, not a statistical weighted-frequency guarantee. |
+| Imported Choose | nonnegative weights | Executes one weighted child recipe, mutating the current cursor. All-zero weights execute none. Bench checks routing and measured 1:3 frequencies over 4,096 seeds. |
 
 Typed decimals are retained at the control's supported precision; the button step is
 an increment, not a requirement to snap every typed number to that increment. Held
-buttons accelerate smoothly and stop at the editing limit. See the existing number-hold
+buttons accelerate smoothly and stop at the editing limit. Empty input and Escape retain
+the previous value; arrow keys first commit a typed value before nudging it. Invalid color
+text reverts on blur. See the existing number-hold
 tests for acceleration anchors and cancellation behavior.
 
 ## Run the measuring bench
@@ -210,7 +222,11 @@ must reach all sectors without significant concentration or large angular gaps, 
 after applying the real population transforms. Geometry tolerance is 0.000002 m. Normals and
 indices are checked for finite/valid output, including zero and negative dimensions.
 
-The same assertions run under `pnpm test`. Browser measurement tests additionally type
-values through the real controls and inspect live renderer buffers. The audit does
+The same assertions run under `pnpm test`. The composition bench adds 128 generated
+recipes covering all phrase types, export/reimport, input immutability, and inherited
+scale. Separate output-deviance groups recover all 15 builder quantities from vertices
+or copy counts over 2,048 seeds each, checking range coverage and distribution without
+consulting the compiler's random-sample trace. Browser tests type through real controls, inspect live buffers, and measure the
+actual LOD mask shader's area and monotonic growth. The audit does
 not claim exhaustive nested combinations, all 2³² seeds, absence of self-intersection,
 or correctness of every lighting/LOD pixel. [Dated findings](VEGETATION_CONTROL_AUDIT.md).

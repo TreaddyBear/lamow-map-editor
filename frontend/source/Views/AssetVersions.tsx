@@ -40,9 +40,9 @@ export function AssetVersions({ asset, baselineAsset, currentVersionId, onVersio
       let item = index.archetypes.find(item => item.speciesId === asset.species.id);
       if (!item) { index = await ensureArchetype(baselineAsset); item = index.archetypes.find(item => item.speciesId === asset.species.id); }
       if (!item) throw new Error("The archetype could not be opened.");
-      const digest = currentVersionId ? null : await assetDigest(asset);
+      const digests: string[] = currentVersionId ? [] : await Promise.all([assetDigest(asset), assetDigest(asset, true)]);
       const id = item.versions.find(version => version.id === currentVersionId)?.id
-        ?? [...item.versions].reverse().find(version => version.assetHash === digest)?.id
+        ?? [...item.versions].reverse().find(version => digests.includes(version.assetHash))?.id
         ?? item.standardVersionId ?? item.versions[0].id;
       const saved = await readVersion(id);
       if (cancelled) return;

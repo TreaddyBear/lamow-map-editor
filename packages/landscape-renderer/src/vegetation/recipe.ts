@@ -3,15 +3,19 @@ import { fieldFlowerShapeToRecipe, cloverClusterShapeToRecipe, type GrowthPhrase
 import { defaultObjPrimitiveLibrary, objPrimitiveToRenderData, type ObjPrimitiveMesh } from "./objPrimitives.js";
 import { degreesToRadians, stemGrowthVector, stemOrientationQuaternion } from "./geometry.js";
 import { growthArcPose, subdivideGrowthSource } from "./growthPath.js";
-import { createVegetationRandom } from "./random.js";
+import { vegetationFieldRandom } from "./random.js";
 
 export type CompiledPlantPart = { phraseId: string; materialId: string; positions: number[]; indices: number[]; colors: number[] };
 /** Optional measuring hook for the modifier bench; normal rendering allocates no trace records. */
 export type VegetationCompileOptions = {
   onSample?: (sample: { phraseId: string; field: string; ideal: number; deviation: number; value: number }) => void;
 };
-type Cursor = { position: Vector3; rotation: Quaternion; scale: number; materialId: string; lastRoot: Vector3; lastPath?: (t: number) => { position: Vector3; rotation: Quaternion } };
+type Cursor = { position: Vector3; rotation: Quaternion; scale: number; materialId: string; lastRoot: Vector3; branchRotation?: Quaternion; lastPath?: (t: number) => { position: Vector3; rotation: Quaternion } };
 const copyCursor = (cursor: Cursor): Cursor => ({ ...cursor, position: cursor.position.clone(), rotation: cursor.rotation.clone(), lastRoot: cursor.lastRoot.clone() });
+const assertRenderable = (point: Vector3) => {
+  const limit = 3.4028234663852886e38;
+  if (!(Math.abs(point.x) <= limit && Math.abs(point.y) <= limit && Math.abs(point.z) <= limit)) throw new Error("Recipe exceeds renderable coordinates. Reduce inherited scale or dimensions.");
+};
 const orientedIndices = (indices: number[], mirrored: boolean) => {
   if (!mirrored) return indices;
   const reversed = indices.slice();
@@ -21,24 +25,19 @@ const orientedIndices = (indices: number[], mirrored: boolean) => {
 
 /** Pure seeded construction: no scene, DOM, camera, or gameplay dependencies. */
 export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed = 1, primitives: ObjPrimitiveMesh[] = asset.primitives ?? defaultObjPrimitiveLibrary(), options?: VegetationCompileOptions): CompiledPlantPart[] {
+  if (asset.generationVersion !== undefined && asset.generationVersion !== 1) throw new Error("Unsupported vegetation generation version.");
   const shape = asset.species.parts[0].shape;
   const recipe = asset.species.constructionRecipe ?? (shape.type === "fieldFlower"
     ? fieldFlowerShapeToRecipe(shape, asset.species.parts[0].materialId)
     : shape.type === "cloverCluster" ? cloverClusterShapeToRecipe(shape, asset.species.parts[0].materialId) : undefined);
   if (!recipe) throw new Error(`Shared recipe rendering does not yet support ${shape.type}.`);
-  const random = createVegetationRandom(seed);
-  let phraseId = "";
-  const sample = (field: string, value: IdealVariation | undefined, fallback = 0, circular = false) => {
-    // ±180° already reaches every heading. Wrapping a wider interval can weight
-    // some headings twice (e.g. ±270°), so orientation randomness saturates here.
-    // Path bend and spread are geometric amounts and must retain their full range.
-    const deviation = value ? circular ? Math.min(180, value.deviation) : value.deviation : 0;
-    const result = value ? value.ideal + (random() * 2 - 1) * deviation : fallback;
-    if (options?.onSample) options.onSample({ phraseId, field, ideal: value?.ideal ?? fallback, deviation: value?.deviation ?? 0, value: result });
-    return result;
-  };
-  const count = (value: IdealVariation) => Math.max(0, Math.min(64, Math.round(sample("count", value))));
   const parts: CompiledPlantPart[] = [];
+  const vertexBudget = 131072;
+  let emittedVertices = 0;
+  const reserveVertices = (count: number) => {
+    if (emittedVertices + count > vertexBudget) throw new Error(`Recipe exceeds ${vertexBudget.toLocaleString("en-US")} rendered vertices per plant. Reduce copies or source detail.`);
+    emittedVertices += count;
+  };
   const sourceData = new Map(primitives.map((primitive) => [primitive.id, objPrimitiveToRenderData(primitive)]));
   let steps = 0;
   const rotate = (cursor: Cursor, vector: Vector3) => vector.rotateByQuaternionToRef(cursor.rotation, new Vector3());
@@ -46,6 +45,7 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
     if (parts.length >= 2048) throw new Error("Recipe exceeds 2048 forms per plant.");
     const source = sourceData.get(primitiveId);
     if (!source) throw new Error(`Missing primitive "${primitiveId}".`);
+    reserveVertices(source.positions.length / 3);
     const axial = primitiveId === "stemSkin" || primitiveId === "quadSlat";
     const data = { positions: source.positions.slice(), indices: orientedIndices(source.indices, (axial ? scale.y : scale.x * scale.y * scale.z) * cursor.scale < 0), colors: source.colors };
     const matrix = Matrix.Compose(Vector3.One().scale(cursor.scale), cursor.rotation, cursor.position);
@@ -61,16 +61,26 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
         y *= scale.y;
       } else { x *= scale.x; y *= scale.y; z *= scale.z; }
       const point = Vector3.TransformCoordinates(new Vector3(x, y, z), matrix);
+      assertRenderable(point);
       data.positions[i] = point.x; data.positions[i + 1] = point.y; data.positions[i + 2] = point.z;
     }
     parts.push({ phraseId: id, materialId, ...data });
   };
-  const walk = (phrases: GrowthPhrase[], cursor: Cursor, depth: number) => {
+  const walk = (phrases: GrowthPhrase[], cursor: Cursor, depth: number, instancePath: (string | number)[] = []) => {
     if (depth > 16) throw new Error("Recipe nesting exceeds 16 levels.");
     for (const phrase of phrases) {
-      phraseId = phrase.id;
+      const random = (field: string) => vegetationFieldRandom(seed, JSON.stringify([...instancePath, phrase.id, field]));
+      const sample = (field: string, value: IdealVariation | undefined, fallback = 0, circular = false, instance = "") => {
+        // Heading variation saturates at a full circle; path bend/spread retain turns.
+        const deviation = value ? circular ? Math.min(180, value.deviation) : value.deviation : 0;
+        const result = value ? value.ideal + (random(field + instance) * 2 - 1) * deviation : fallback;
+        if (options?.onSample) options.onSample({ phraseId: phrase.id, field, ideal: value?.ideal ?? fallback, deviation: value?.deviation ?? 0, value: result });
+        return result;
+      };
+      const count = (value: IdealVariation) => Math.max(0, Math.min(64, Math.round(sample("count", value))));
       if (++steps > 8192) throw new Error("Recipe exceeds the construction budget.");
       if (phrase.type === "continue") {
+        cursor.branchRotation = undefined;
         const distance = sample("distance", phrase.distance);
         const arc = sample("arcDegrees", phrase.arcDegrees), azimuth = sample("arcAzimuthDegrees", phrase.arcAzimuthDegrees, 0, true);
         const local = stemGrowthVector(distance, arc, azimuth);
@@ -85,12 +95,16 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
             if (parts.length >= 2048) throw new Error("Recipe exceeds 2048 forms per plant.");
             const primitive = phrase.formAlongPath === "blade" ? "quadSlat" : "stemSkin";
             const original = sourceData.get(primitive); if (!original) throw new Error(`Missing primitive "${primitive}".`);
-            const source = subdivideGrowthSource(original, Math.max(1, Math.ceil(Math.abs(arc) / 12)));
+            const segments = Math.max(1, Math.ceil(Math.abs(arc) / 12));
+            if (original.indices.length * segments > vertexBudget * 6) throw new Error("Curved source exceeds the tessellation budget. Reduce bend or source detail.");
+            const source = subdivideGrowthSource(original, segments);
+            reserveVertices(source.positions.length / 3);
             const positions: number[] = [];
             for (let i = 0; i < source.positions.length; i += 3) {
               const t = source.positions[i + 1], pose = path(t), r = (radius + (endRadius - radius) * t) * 2 * root.scale;
               const offset = new Vector3(source.positions[i] * r, 0, source.positions[i+2] * r).rotateByQuaternionToRef(pose.rotation, new Vector3());
-              positions.push(...pose.position.add(offset).asArray());
+              const point = pose.position.add(offset); assertRenderable(point);
+              positions.push(point.x, point.y, point.z);
             }
             parts.push({ phraseId: phrase.id, materialId: cursor.materialId, positions, indices: orientedIndices(source.indices, distance * root.scale < 0), colors: source.colors });
           }
@@ -106,7 +120,9 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
         cursor.position.addInPlace(rotate(cursor, local).scale(cursor.scale));
         cursor.rotation = nextRotation;
       } else if (phrase.type === "steer") {
-        cursor.rotation = cursor.rotation.multiply(Quaternion.RotationYawPitchRoll(degreesToRadians(sample("yawDegrees", phrase.yawDegrees, 0, true)), degreesToRadians(sample("pitchDegrees", phrase.pitchDegrees, 0, true)), degreesToRadians(sample("rollDegrees", phrase.rollDegrees, 0, true))));
+        const rotation = Quaternion.RotationYawPitchRoll(degreesToRadians(sample("yawDegrees", phrase.yawDegrees, 0, true)), degreesToRadians(sample("pitchDegrees", phrase.pitchDegrees, 0, true)), degreesToRadians(sample("rollDegrees", phrase.rollDegrees, 0, true)));
+        cursor.rotation = cursor.rotation.multiply(rotation);
+        if (cursor.lastPath) cursor.branchRotation = (cursor.branchRotation ?? Quaternion.Identity()).multiply(rotation);
         cursor.scale *= sample("scale", phrase.scale, 1);
       } else if (phrase.type === "color") {
         cursor.materialId = phrase.materialId;
@@ -122,12 +138,13 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
         const radius = sample("radius", phrase.radius) * cursor.scale;
         for (let i = 0; i < total; i++) {
           const child = copyCursor(cursor);
-          const theta = phrase.layout === "sameAxis" ? 0 : phrase.layout === "cluster" ? random() * spread
+          const theta = phrase.layout === "sameAxis" ? 0 : phrase.layout === "cluster" ? random("cluster:" + i) * spread
             : phrase.layout === "mirrored" ? (i % 2 ? 1 : -1) * spread * (Math.floor(i / 2) + 1) / (2 * Math.ceil(total / 2))
-            : phrase.layout === "spiral" ? i * 2.399963229728653 * spread / (Math.PI * 2) : i * spread / (Math.abs(Math.abs(spread) - Math.PI * 2) < 0.001 ? total : Math.max(1, total - 1));
+            : phrase.layout === "spiral" ? i * 2.399963229728653 * spread / (Math.PI * 2) : i * spread / total;
           child.position.addInPlace(rotate(cursor, new Vector3(Math.sin(theta) * radius, 0, Math.cos(theta) * radius)));
           child.rotation = child.rotation.multiply(Quaternion.RotationYawPitchRoll(theta, 0, 0));
-          walk(phrase.continuation, child, depth + 1);
+          child.lastRoot = child.position.clone(); child.lastPath = undefined; child.branchRotation = undefined;
+          walk(phrase.continuation, child, depth + 1, [...instancePath, phrase.id, i]);
         }
       } else if (phrase.type === "branch") {
         const total = count(phrase.count);
@@ -136,19 +153,19 @@ export function compileVegetationPlant(asset: VegetationSpeciesAssetFile, seed =
           const t = phrase.layout === "tip" || phrase.layout === "fromForm" ? 1 : phrase.layout === "radial" ? 0.5 : (i + 1) / (total + 1);
           const attachment = cursor.lastPath?.(t);
           child.position = attachment?.position ?? Vector3.Lerp(cursor.lastRoot, cursor.position, t);
-          if (attachment) child.rotation = attachment.rotation;
-          phraseId = phrase.id;
-          const around = degreesToRadians(sample("aroundAxisDegrees", phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees, 0, true));
+          if (attachment) child.rotation = attachment.rotation.multiply(cursor.branchRotation ?? Quaternion.Identity());
+          const around = degreesToRadians(sample("aroundAxisDegrees", phrase.aroundAxisDegrees ?? phrase.sideBiasDegrees, 0, true, ":" + i));
           const theta = around + (phrase.layout === "alternating" ? i * Math.PI : i * Math.PI * 2 / Math.max(1, total));
-          child.rotation = child.rotation.multiply(Quaternion.RotationYawPitchRoll(theta, -degreesToRadians(sample("deviationDegrees", phrase.deviationDegrees ?? { ideal: 55, deviation: 8 })), 0));
-          walk(phrase.offshoot, child, depth + 1);
+          child.rotation = child.rotation.multiply(Quaternion.RotationYawPitchRoll(theta, -degreesToRadians(sample("deviationDegrees", phrase.deviationDegrees ?? { ideal: 55, deviation: 8 }, 0, false, ":" + i)), 0));
+          child.lastRoot = child.position.clone(); child.lastPath = undefined; child.branchRotation = undefined;
+          walk(phrase.offshoot, child, depth + 1, [...instancePath, phrase.id, i]);
         }
       } else if (phrase.type === "choose") {
         const total = phrase.options.reduce((sum, option) => sum + Math.max(0, option.weight), 0);
-        let target = random() * total;
+        let target = random("choice") * total;
         for (const option of phrase.options) {
           target -= Math.max(0, option.weight);
-          if (target < 0) { walk(option.phrase, cursor, depth + 1); break; }
+          if (target < 0) { walk(option.phrase, cursor, depth + 1, [...instancePath, phrase.id, "choice"]); break; }
         }
       }
     }

@@ -2,6 +2,7 @@ import { Color3, Effect, Mesh, ShaderMaterial, Vector2, Vector3, Vector4, Vertex
 import { gameGrassSettings as reference } from "./gameReference/settings.js";
 import type { GrassBake } from "./grassBake.js";
 import type { GrassLodSettings, VegetationSpeciesAssetFile } from "./assets.js";
+import { coverageDotRadius } from "./coveragePattern.js";
 
 /** Extracted from LaMow c35d779 grassSlats.ts. The shader and baked detail are the game's;
  * the host supplies patch bounds, terrain, masks and tuning instead of game globals. */
@@ -135,6 +136,7 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
       uniform float vegetationCoverage;
       uniform float patternMode;
       uniform float patternScale;
+      uniform float dotRadius;
       uniform vec3 topColorA;
       uniform vec3 topColorB;
       uniform vec3 midColor;
@@ -223,7 +225,7 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
         vec2 cell = vWorldPos.xz / max(0.1, patternScale);
         float pick = patternMode < 0.5
           ? step(fract((cell.x + cell.y) * 0.70710678), vegetationCoverage)
-          : step(length(fract(cell) - 0.5), sqrt(vegetationCoverage / PI));
+          : step(length(fract(cell) - 0.5), dotRadius);
         float vegetation = vegetationCoverage <= 0.0 ? 0.0 : vegetationCoverage >= 1.0 ? 1.0 : pick;
         vec3 topMix = mix(mix(grassTopColorA, grassTopColorB, vColorPick), mix(topColorA, topColorB, vColorPick), vegetation);
         vec3 middle = mix(grassMidColor, midColor, vegetation);
@@ -266,7 +268,7 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
 
   const material = new ShaderMaterial("vegetation-slats-material-" + layerMask, scene, "vegetationSlats", {
     attributes: ["position", "normal", "uv", "groundY", "cover"],
-    uniforms: ["grassTopColorA", "grassTopColorB", "grassMidColor", "grassBottomColor", "vegetationCoverage", "patternMode", "patternScale", "worldViewProjection", "cameraPosition", "bounds", "slatHeight", "topColorA", "topColorB", "midColor", "bottomColor", "slatMidPoint", "skyAmbientColor", "skyAmbientIntensity", "lightDir", "tileScale", "normalStrength", "roughness", "specIntensity", "sheen", "cutoff", "wiggleAmp", "wiggleFreq", "bendAmp", "time", "windAmp", "windDirection", "lodFade", "lodCenter", "slatFadeDistance", "slatFadeBand", "slatMaxDistance"],
+    uniforms: ["grassTopColorA", "grassTopColorB", "grassMidColor", "grassBottomColor", "vegetationCoverage", "patternMode", "patternScale", "dotRadius", "worldViewProjection", "cameraPosition", "bounds", "slatHeight", "topColorA", "topColorB", "midColor", "bottomColor", "slatMidPoint", "skyAmbientColor", "skyAmbientIntensity", "lightDir", "tileScale", "normalStrength", "roughness", "specIntensity", "sheen", "cutoff", "wiggleAmp", "wiggleFreq", "bendAmp", "time", "windAmp", "windDirection", "lodFade", "lodCenter", "slatFadeDistance", "slatFadeBand", "slatMaxDistance"],
     samplers: ["mowField", "grassNormal", "grassAlbedo"], needAlphaTesting: true,
   });
   material.setTexture("mowField", mowTexture); material.setTexture("grassNormal", bake.normalTex); material.setTexture("grassAlbedo", bake.albedoTex);
@@ -284,6 +286,7 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
       material.setFloat("vegetationCoverage", coverage);
       material.setFloat("patternMode", grass.pattern === "dots" ? 1 : 0);
       material.setFloat("patternScale", grass.patternScale ?? 0.8);
+      material.setFloat("dotRadius", coverageDotRadius(coverage));
       const strength = asset.species.lod.farStrength ?? 0.5;
       const tint = Color3.FromHexString(asset.species.lod.farColor ?? asset.species.materials[asset.species.parts[0].materialId].baseColor);
       const referenceColors: Record<string, string> = { topColorA: reference.lodSlatTopColorA, topColorB: reference.lodSlatTopColorB, midColor: reference.lodSlatMidColor, bottomColor: reference.lodSlatBottomColor };

@@ -49,11 +49,11 @@ export function createVegetationSpeciesLayer(input: {
   };
   const rebuild = (placementsChanged = false) => {
     if (disposed) throw new Error("Vegetation layer is disposed.");
-    const nextGeometrySignature = JSON.stringify([asset.species.constructionRecipe ?? asset.species.parts, asset.primitives], (key, value) => key === "label" || key === "displayName" ? undefined : value);
+    const nextGeometrySignature = JSON.stringify([asset.generationVersion ?? 1, asset.species.constructionRecipe ?? asset.species.parts, asset.primitives], (key, value) => key === "label" || key === "displayName" ? undefined : value);
     const nextPlacementSignature = JSON.stringify(asset.species.instanceRanges);
     const geometryChanged = nextGeometrySignature !== geometrySignature;
     const transformsChanged = placementsChanged || nextPlacementSignature !== placementSignature;
-    for (const [id, definition] of Object.entries(asset.species.materials)) {
+    const updateMaterials = () => { for (const [id, definition] of Object.entries(asset.species.materials)) {
       let material = materialMap.get(id);
       if (!material) {
         material = new StandardMaterial("species-" + asset.species.id + "-" + id, input.scene);
@@ -63,8 +63,8 @@ export function createVegetationSpeciesLayer(input: {
       material.diffuseColor = Color3.FromHexString(definition.baseColor);
       material.emissiveColor = Color3.FromHexString(definition.emissiveColor ?? "#000000").scale(definition.emissiveStrength ?? 0);
       material.alpha = definition.alpha ?? 1;
-    }
-    if (!geometryChanged && !transformsChanged) return;
+    } };
+    if (!geometryChanged && !transformsChanged) { updateMaterials(); return; }
     const groups = new Map<number, number[]>();
     plants.forEach((plant, index) => {
       const seed = (plant.seed >>> 0) % 16;
@@ -78,6 +78,7 @@ export function createVegetationSpeciesLayer(input: {
       cache?.plants.set(seed, parts);
       return [seed, parts];
     }));
+    updateMaterials();
     const previous = new Map(batches.map((batch) => [batch.key, batch]));
     const next: Batch[] = [];
     for (const [seed, plantIndices] of groups) {
@@ -100,7 +101,10 @@ export function createVegetationSpeciesLayer(input: {
           const positions: number[] = [], indices: number[] = [], colors: number[] = [], normals: number[] = [];
           for (const part of selected) {
             const offset = positions.length / 3;
-            positions.push(...part.positions); indices.push(...part.indices.map((index) => index + offset)); colors.push(...part.colors);
+            // Large valid OBJ sources can exceed the argument-count limit of push(...array).
+            for (const position of part.positions) positions.push(position);
+            for (const index of part.indices) indices.push(index + offset);
+            for (const color of part.colors) colors.push(color);
           }
           VertexData.ComputeNormals(positions, indices, normals);
           const mesh = batch.mesh;
@@ -144,10 +148,15 @@ export function createVegetationSpeciesLayer(input: {
   return {
     get meshes() { return batches.map((batch) => batch.mesh); },
     get plantCount() { return plants.length; },
-    setAsset(next: VegetationSpeciesAssetFile) { asset = next; rebuild(); },
+    setAsset(next: VegetationSpeciesAssetFile) {
+      const previous = asset; asset = next;
+      try { rebuild(); } catch (error) { asset = previous; throw error; }
+    },
     setPlants(next: VegetationPlacement[]) {
       if (next.some((plant) => ![plant.x, plant.z, plant.seed, plant.yaw ?? 0, plant.scale ?? 1].every(Number.isFinite))) throw new Error("Plant placements must be finite.");
-      plants = next.map((plant) => ({ ...plant })); mowed.clear(); hidden.clear(); rebuild(true);
+      const previous = plants; plants = next.map((plant) => ({ ...plant }));
+      try { rebuild(true); } catch (error) { plants = previous; throw error; }
+      mowed.clear(); hidden.clear(); refresh();
     },
     mowCircle(x: number, z: number, radius: number) {
       if (![x, z, radius].every(Number.isFinite) || radius < 0) throw new Error("Mowing requires a finite position and nonnegative radius.");

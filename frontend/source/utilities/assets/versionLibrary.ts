@@ -27,7 +27,7 @@ export async function exportArchetype(asset: VegetationSpeciesAssetFile, current
   const index = await readVersionLibrary();
   const entry = index.archetypes.find(entry => entry.speciesId === asset.species.id);
   const versions = await Promise.all((entry?.versions ?? []).map(version => readVersion(version.id)));
-  return { ...asset, archetypeLibrary: { versions, standardVersionId: entry?.standardVersionId ?? null, currentVersionId } satisfies ArchetypeArchive };
+  return { ...asset, generationVersion: asset.generationVersion ?? 1, archetypeLibrary: { versions, standardVersionId: entry?.standardVersionId ?? null, currentVersionId } satisfies ArchetypeArchive };
 }
 export async function readVersion(id: string) {
   const snapshot = await request<VersionSnapshot>("/versions/" + encodeURIComponent(id));
@@ -35,8 +35,12 @@ export async function readVersion(id: string) {
 }
 export const saveVersion = (asset: VegetationSpeciesAssetFile, label: string, expectedRevision: number, parentVersionId: string | null, kind: "saved" | "recovery" = "saved") => request<{ index: VersionLibrary; version: SavedVersion }>("/versions", { asset, label, expectedRevision, parentVersionId, kind });
 export const makeStandard = (speciesId: string, versionId: string, expectedRevision: number) => request<VersionLibrary>("/standard", { speciesId, versionId, expectedRevision });
-export async function assetDigest(asset: VegetationSpeciesAssetFile) {
-  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(parseVegetationAsset(JSON.stringify(asset)))));
+export async function assetDigest(asset: VegetationSpeciesAssetFile, unmarkedGeneration = false) {
+  const normalized = parseVegetationAsset(JSON.stringify(asset));
+  // Old immutable versions hashed the same document before generationVersion existed.
+  // Match them without rewriting either their snapshot or integrity hash.
+  if (unmarkedGeneration) delete normalized.generationVersion;
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(normalized)));
   return [...new Uint8Array(bytes)].map(value => value.toString(16).padStart(2, "0")).join("");
 }
 export async function readArchetypeCatalog(): Promise<CatalogAsset[]> {

@@ -146,6 +146,12 @@ a TypeScript file that is not the current normal game loading path.
 - [Modifier reference](docs/VEGETATION_MODIFIERS.md) — each control's range, units, effect, expected no-ops, and known quirks.
 - [Control verification](docs/VEGETATION_CONTROL_AUDIT.md) — prior fixes and measured limits.
 
+`pnpm audit:modifiers` produces a searchable report at `.tmp/modifier-audit/index.html`.
+It checks control ranges, random distributions, and component combinations. The normal
+test suite also protects 48 established outputs under `generationVersion: 1`, so later
+generator changes cannot silently redefine refined assets. See the modifier reference
+for the compatibility rules and remaining authoring limitations.
+
 Older root contracts and planning notes document earlier formats and decisions; this README
 and the dated interface audit describe the current workflow. The editor's version library
 establishes the asset source for future game integration. A cross-project React component

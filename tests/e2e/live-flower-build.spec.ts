@@ -49,7 +49,7 @@ test("builds a flower from scratch and deforms live while holding size control",
 
   await page.getByRole("button", { name: "Form saddle petal" }).first().click();
   await expect(page.getByText("Length", { exact: true })).toBeVisible();
-  const lengthInput = page.getByText("Length", { exact: true }).locator("..").locator("input").first();
+  const lengthInput = page.getByTestId("variation-length").locator("input").first();
   const beforeHoldHash = await previewHash(preview);
 
   const increaseIdeal = page.getByRole("button", { name: "Increase Ideal" }).first();

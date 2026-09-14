@@ -1074,6 +1074,7 @@ function NumberField({ label, value, step, min, max, onChange, holdAcceleration 
   };
   const commit = (raw: string) => {
     if (raw === formatNumber(valueRef.current, step)) return true;
+    if (!raw.trim()) return false;
     const parsed = Number(raw);
     if (!Number.isFinite(parsed)) return false;
     const next = normalizeStep(clamp(parsed), step);
@@ -1152,7 +1153,7 @@ function NumberField({ label, value, step, min, max, onChange, holdAcceleration 
   return (
     <FormLabel>
       {label}
-      <div className="grid h-8 grid-cols-[1.35rem_minmax(2.9rem,1fr)_1.35rem] overflow-hidden rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] transition duration-75 focus-within:border-[#2f6f34] focus-within:shadow-[0_0_0_2px_rgb(47_111_52_/_18%)]">
+      <div className="grid h-8 grid-cols-[1.1rem_minmax(3.4rem,1fr)_1.1rem] overflow-hidden rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] transition duration-75 focus-within:border-[#2f6f34] focus-within:shadow-[0_0_0_2px_rgb(47_111_52_/_18%)]">
         <button
           aria-label={`Decrease ${label}`}
           className="select-none border-r border-[var(--input-border)] text-[11px] font-bold leading-none text-[var(--muted-text)] outline-none hover:bg-[var(--hover-bg)] focus-visible:bg-[var(--subtle-bg)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
@@ -1185,11 +1186,18 @@ function NumberField({ label, value, step, min, max, onChange, holdAcceleration 
             if (event.key === "Enter") event.currentTarget.blur();
             if (event.key === "ArrowUp") {
               event.preventDefault();
+              commit(event.currentTarget.value);
               nudge(1, event.shiftKey ? 10 : 1);
             }
             if (event.key === "ArrowDown") {
               event.preventDefault();
+              commit(event.currentTarget.value);
               nudge(-1, event.shiftKey ? 10 : 1);
+            }
+            if (event.key === "Escape") {
+              event.preventDefault(); event.stopPropagation();
+              event.currentTarget.value = formatNumber(valueRef.current, step);
+              setDraft(event.currentTarget.value); event.currentTarget.blur();
             }
           }}
         />
@@ -1234,6 +1242,7 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
   useEffect(() => setDraft(value), [value]);
   const commit = () => {
     const nextValue = draft.trim();
+    if (nextValue === value) return;
     const result = onChange(nextValue);
     if (result === false) setDraft(value);
   };
@@ -1256,7 +1265,9 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
 
 function ColorField({ label, value, onChange }: { label: string; value: ColorHex; onChange: (value: ColorHex) => void }) {
   const commitText = (nextValue: string) => {
-    if (/^#[0-9A-Fa-f]{6}$/.test(nextValue)) onChange(nextValue as ColorHex);
+    if (!/^#[0-9A-Fa-f]{6}$/.test(nextValue)) return false;
+    if (nextValue !== value) onChange(nextValue as ColorHex);
+    return true;
   };
   return (
     <FormLabel>
@@ -1268,9 +1279,10 @@ function ColorField({ label, value, onChange }: { label: string; value: ColorHex
           className="w-full rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] px-2 py-2 text-[var(--app-text)]"
           defaultValue={value}
           spellCheck={false}
-          onBlur={(event) => commitText(event.currentTarget.value)}
+          onBlur={(event) => { if (!commitText(event.currentTarget.value.trim())) event.currentTarget.value = value; }}
           onKeyDown={(event) => {
             if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.value = value; event.currentTarget.blur(); }
           }}
         />
       </div>

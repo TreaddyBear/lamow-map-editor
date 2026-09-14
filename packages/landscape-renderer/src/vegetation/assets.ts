@@ -196,6 +196,8 @@ export type VegetationGrowthRecipe = {
 
 export type VegetationSpeciesAssetFile = {
   assetVersion: 1;
+  /** Procedural behavior contract, independent of file format and archetype versions. */
+  generationVersion?: 1;
   kind: "vegetationSpecies";
   primitives?: ObjPrimitiveMesh[];
   species: VegetationSpeciesDefinition;
@@ -335,6 +337,7 @@ export function parseVegetationAsset(text: string): VegetationSpeciesAssetFile {
   if (!value || value.assetVersion !== 1 || value.kind !== "vegetationSpecies" || !value.species) {
     throw new Error("Expected a vegetationSpecies assetVersion 1 file.");
   }
+  if (value.generationVersion !== undefined && value.generationVersion !== 1) throw new Error("Unsupported vegetation generation version. This editor supports version 1.");
   if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(value.species.id)) {
     throw new Error("Species id must match ^[A-Za-z][A-Za-z0-9_-]*$.");
   }
@@ -354,6 +357,14 @@ export function parseVegetationAsset(text: string): VegetationSpeciesAssetFile {
   if (value.species.constructionRecipe) validateRecipeStructure(value.species.constructionRecipe);
   if (value.editor?.grassLod?.pattern !== undefined && !["stripes", "dots"].includes(value.editor.grassLod.pattern)) throw new Error("Unknown slat coverage pattern.");
   if (value.editor?.grassLod?.patternScale !== undefined && (!Number.isFinite(value.editor.grassLod.patternScale) || value.editor.grassLod.patternScale < 0.1 || value.editor.grassLod.patternScale > 10)) throw new Error("Slat pattern scale must be between 0.1 and 10 metres.");
+  const grass = value.editor?.grassLod;
+  if (grass?.density !== undefined && (!Number.isFinite(grass.density) || grass.density < 0.05 || grass.density > 3)) throw new Error("Slat density must be between 0.05 and 3.");
+  for (const key of ["preview50Color", "preview100Color", "topColorA", "topColorB", "midColor", "bottomColor"] as const) {
+    if (grass?.[key] !== undefined && !/^#[0-9a-f]{6}$/i.test(grass[key])) throw new Error(`Invalid slat color ${key}.`);
+  }
+  const preview = value.editor?.preview;
+  if (preview?.groundPatchMeters !== undefined && (!Number.isFinite(preview.groundPatchMeters) || preview.groundPatchMeters < 1 || preview.groundPatchMeters > 8)) throw new Error("Preview patch width must be between 1 and 8 metres.");
+  if (preview?.populationSeed !== undefined && (!Number.isInteger(preview.populationSeed) || preview.populationSeed < 0 || preview.populationSeed > 4294967295)) throw new Error("Preview seed must be an unsigned 32-bit integer.");
   const species = ensureSpeciesRecipe(migrateLegacySpecies(value.species));
   validateSpecies(species);
   // A portable archetype may carry its version archive alongside the current asset.
@@ -361,6 +372,7 @@ export function parseVegetationAsset(text: string): VegetationSpeciesAssetFile {
   const { archetypeLibrary: _archive, ...assetFields } = value as Partial<VegetationSpeciesAssetFile> & { archetypeLibrary?: unknown };
   return {
     ...assetFields,
+    generationVersion: 1,
     species,
     editor: {
       ...value.editor,
@@ -547,10 +559,11 @@ function validateSpecies(species: VegetationSpeciesDefinition) {
     }
     validateShape(part.shape);
   }
-  if (species.lod.farStrength !== undefined && (species.lod.farStrength < 0 || species.lod.farStrength > 1)) {
+  if (species.lod.farColor !== undefined && !/^#[0-9a-f]{6}$/i.test(species.lod.farColor)) throw new Error("Invalid far color.");
+  if (species.lod.farStrength !== undefined && (!Number.isFinite(species.lod.farStrength) || species.lod.farStrength < 0 || species.lod.farStrength > 1)) {
     throw new Error("lod.farStrength must be between 0 and 1.");
   }
-  if (species.lod.maxRenderDistance !== undefined && species.lod.maxRenderDistance <= 0) {
+  if (species.lod.maxRenderDistance !== undefined && (!Number.isFinite(species.lod.maxRenderDistance) || species.lod.maxRenderDistance <= 0)) {
     throw new Error("lod.maxRenderDistance must be greater than 0.");
   }
   if (species.constructionRecipe) validateRecipe(species.constructionRecipe, species);
@@ -575,10 +588,15 @@ function validateRecipeStructure(recipe: VegetationGrowthRecipe) {
   const walk = (phrases: GrowthPhrase[], depth: number) => {
     if (!Array.isArray(phrases) || depth > 16) throw new Error("Invalid recipe nesting (maximum 16 levels).");
     for (const phrase of phrases) {
-      if (!phrase || typeof phrase.id !== "string" || ids.has(phrase.id) || ++phrasesSeen > 512) throw new Error("Recipe requires unique phrase ids and at most 512 phrases.");
+      if (!phrase || typeof phrase.id !== "string" || !phrase.id.trim() || ids.has(phrase.id) || ++phrasesSeen > 512) throw new Error("Recipe requires nonempty unique phrase ids and at most 512 phrases.");
+      if (typeof phrase.label !== "string") throw new Error("Recipe components require a text label.");
       ids.add(phrase.id);
       if (!["continue", "fork", "branch", "steer", "form", "color", "choose"].includes(phrase.type)) throw new Error("Unsupported recipe phrase.");
       if (phrase.type === "continue" && phrase.pathMode !== undefined && !["arc", "legacyDirection"].includes(phrase.pathMode)) throw new Error("Unsupported growth path mode.");
+      if (phrase.type === "continue" && phrase.formAlongPath !== undefined && !["none", "stemSkin", "blade"].includes(phrase.formAlongPath)) throw new Error("Unsupported growth skin.");
+      if (phrase.type === "fork" && !["radial", "spiral", "mirrored", "cluster", "sameAxis"].includes(phrase.layout)) throw new Error("Unsupported Fork layout.");
+      if (phrase.type === "branch" && !["alongPath", "radial", "alternating", "tip", "fromForm"].includes(phrase.layout)) throw new Error("Unsupported Branch layout.");
+      if (phrase.type === "form" && !["stemSkin", "saddlePetal", "centerDisc", "leafBlade", "quadSlat", "seedFuzz", "importedMesh"].includes(phrase.primitive)) throw new Error("Unsupported Form primitive.");
       for (const variation of collectPhraseVariations(phrase)) {
         if (!variation || !Number.isFinite(variation.ideal) || !Number.isFinite(variation.deviation) || variation.deviation < 0 || Math.abs(variation.ideal) + variation.deviation > 10000) throw new Error("Invalid recipe variation.");
       }

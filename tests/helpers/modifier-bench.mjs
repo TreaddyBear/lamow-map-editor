@@ -7,6 +7,8 @@ import { parseObjPrimitiveMesh, objPrimitiveToRenderData } from "../../packages/
 import { createVegetationPatchPlacements } from "../../packages/landscape-renderer/dist/vegetation/coverage.js";
 import { createVegetationSpeciesLayer } from "../../packages/landscape-renderer/dist/vegetation/speciesLayer.js";
 import { runAngularBench } from "./angular-bench.mjs";
+import { runAuthoringBehaviorBench } from "./authoring-behavior-bench.mjs";
+import { runDeviationOutputBench } from "./deviation-output-bench.mjs";
 
 // Expected positions use elementary vector math, never the renderer's path, rotation,
 // deformation, or random functions. The trace is an input measurement, not an oracle.
@@ -119,7 +121,7 @@ export function runModifierBench() {
       const s = sampled("fork"), n = Math.round(s.count), spread = rad(s.spreadDegrees);
       assert.equal(parts.length, n);
       for (let i = 0; i < n; i++) {
-        const theta = layout === "sameAxis" ? 0 : layout === "mirrored" ? (i%2 ? 1 : -1)*spread*(Math.floor(i/2)+1)/(2*Math.ceil(n/2)) : layout === "spiral" ? i*rad(137.50776405003785)*(s.spreadDegrees/360) : layout === "cluster" ? Math.atan2(parts[i].positions[3]-parts[i].positions[0], parts[i].positions[5]-parts[i].positions[2]) : i*spread/(Math.abs(Math.abs(spread)-2*Math.PI)<0.001 ? n : Math.max(1,n-1));
+        const theta = layout === "sameAxis" ? 0 : layout === "mirrored" ? (i%2 ? 1 : -1)*spread*(Math.floor(i/2)+1)/(2*Math.ceil(n/2)) : layout === "spiral" ? i*rad(137.50776405003785)*(s.spreadDegrees/360) : layout === "cluster" ? Math.atan2(parts[i].positions[3]-parts[i].positions[0], parts[i].positions[5]-parts[i].positions[2]) : i*spread/n;
         if (layout === "cluster") {
           // The forward marker reveals theta independent of radius, even at radius zero.
           const origin = parts[i].positions.slice(0,3), forward = parts[i].positions.slice(9,12).map((v,j)=>v-origin[j]);
@@ -252,6 +254,6 @@ export function runModifierBench() {
       assert.deepEqual(placements,createVegetationPatchPlacements(asset,{width,seed:1}).slice(0,placements.length));
     });
   });
-  const result=[...groups.values(), ...runAngularBench()];
+  const result=[...groups.values(), ...runAngularBench(), ...runAuthoringBehaviorBench(), ...runDeviationOutputBench()];
   return { schemaVersion:1, tolerance:2e-6, groups:result, cases:result.reduce((n,g)=>n+g.cases.length,0), failures:result.reduce((n,g)=>n+g.failures.length,0), primitiveExtents:sources.map(p=>({id:p.id,axes:["x","y","z"].map(axis=>{const v=p.vertices.map(v=>v[axis]);return {axis,min:Math.min(...v),max:Math.max(...v),span:Math.max(...v)-Math.min(...v)};})})) };
 }

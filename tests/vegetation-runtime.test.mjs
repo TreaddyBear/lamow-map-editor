@@ -11,6 +11,17 @@ import { Vector3 } from "@babylonjs/core";
 import { stemGrowthVector } from "../packages/landscape-renderer/dist/vegetation/geometry.js";
 import { createReferenceGrass } from "../packages/landscape-renderer/dist/vegetation/referenceGrass.js";
 import { gameBladeGeometry, gameBladesPerSquareMeter, gameGrassSettings } from "../packages/landscape-renderer/dist/vegetation/gameReference/settings.js";
+import { generationContractCases, generationFingerprint } from "./helpers/generation-contract.mjs";
+
+test("generation version 1 preserves established output fingerprints across 48 saved cases",()=>{
+  const expected=JSON.parse(readFileSync(new URL("./fixtures/generation-v1.json",import.meta.url),"utf8"));
+  for(const [name,definition] of Object.entries(generationContractCases()))for(let seed=0;seed<16;seed++){
+    assert.deepEqual(generationFingerprint(definition,seed),expected[name][seed],`${name}, seed ${seed}: generation-v1 output changed; preserve compatibility rather than blindly refreshing this fixture`);
+  }
+  const unsupported={...generationContractCases().flower,generationVersion:2};
+  assert.throws(()=>parseVegetationAsset(JSON.stringify(unsupported)),/generation version/);
+  assert.throws(()=>compileVegetationPlant(unsupported),/generation version/);
+});
 
 test("game reference uses real blade geometry, calibrated area and repeatable instances without allocating during recipe edits", () => {
   const engine = new NullEngine(), scene = new Scene(engine);
@@ -280,10 +291,34 @@ test("edits reuse resources, color changes preserve geometry, and invalid drafts
   assert.deepEqual(snapshot(layer), updatedGeometry);
   assert.deepEqual(layer.meshes.map((mesh) => mesh.material), materials);
   const invalid = structuredClone(current);
+  invalid.species.materials.petal.baseColor = "#00ff00";
   invalid.species.constructionRecipe.root.push({ id: "bad", type: "form", primitive: "missing", materialId: "petal" });
   assert.throws(() => layer.setAsset(invalid), /Missing primitive/);
   assert.deepEqual(snapshot(layer), updatedGeometry);
+  assert.equal(layer.meshes.find(mesh=>mesh.name.endsWith("-petal")).material.diffuseColor.toHexString(),"#FF0000","rejected drafts cannot change visible colors");
+  assert.doesNotThrow(()=>layer.setPlants([{x:0,z:0,seed:2}]),"rejected asset cannot poison later population edits");
   layer.setAsset(current); layer.dispose(); engine.dispose();
+});
+
+test("large valid sources render without argument overflow; copy and tessellation budgets reject early",()=>{
+  const definition=asset(), vertexCount=45000;
+  // Flat-shaded seams expand a legal 9,000-source-vertex OBJ to 45,000 render vertices.
+  const source={id:"leafBlade",displayName:"Large source",vertices:Array.from({length:9000},(_,i)=>({id:String(i),x:(i%3===1?1:0),y:(i%3===2?1:0),z:Math.floor(i/3)/vertexCount,color:"#ffffff"})),faces:Array.from({length:vertexCount/3},(_,i)=>({vertices:[i*3%9000,(i*3+1)%9000,(i*3+2)%9000],smoothingGroup:null})),sharpEdges:[]};
+  const form={id:"large",label:"Large",type:"form",primitive:"leafBlade",materialId:"petal",width:{ideal:0.1,deviation:0},length:{ideal:0.1,deviation:0}};
+  definition.primitives=[source];definition.species.constructionRecipe.root=[form];
+  const valid=parseVegetationAsset(JSON.stringify(definition));
+  const engine=new NullEngine(),scene=new Scene(engine),layer=createVegetationSpeciesLayer({scene,asset:valid,groundHeightAt:()=>0});
+  try{
+    layer.setPlants([{x:0,z:0,seed:0}]);assert.equal(layer.meshes[0].getTotalVertices(),vertexCount);
+    assert.ok(layer.meshes[0].getVerticesData("normal").every(Number.isFinite));
+    const before=snapshot(layer),tooMany=structuredClone(valid);
+    tooMany.species.constructionRecipe.root=[{id:"copies",label:"Copies",type:"fork",layout:"radial",count:{ideal:3,deviation:0},continuation:[form]}];
+    assert.throws(()=>layer.setAsset(tooMany),/rendered vertices/);assert.deepEqual(snapshot(layer),before);
+    const curved=structuredClone(valid);curved.primitives[0].id="stemSkin";
+    curved.species.constructionRecipe.root=[{id:"curve",label:"Curve",type:"continue",pathMode:"arc",distance:{ideal:1,deviation:0},arcDegrees:{ideal:360,deviation:0},formAlongPath:"stemSkin"}];
+    assert.throws(()=>compileVegetationPlant(curved),/tessellation budget/);
+    layer.setPlants([{x:1,z:0,seed:0}]);assert.equal(layer.meshes[0].getTotalVertices(),vertexCount);
+  }finally{layer.dispose();scene.dispose();engine.dispose();}
 });
 
 test("all supported fork and branch layouts have distinct geometry with zero random variation", () => {
