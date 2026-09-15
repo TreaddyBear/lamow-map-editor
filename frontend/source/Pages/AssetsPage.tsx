@@ -380,11 +380,16 @@ function AssetEditor({ onOpenMapEditor, onPlaytest, catalog, libraryError, onSta
           <Stack>
             <NumberField label="100% coverage · plants/m²" value={asset.species.coverage?.plantsPerSquareMeter ?? 25} step={0.5} min={0.1} max={200} onChange={(plantsPerSquareMeter) => updateAsset(current => ({ ...current, species: { ...current.species, coverage: { plantsPerSquareMeter } } }))} />
             <details className="rounded-md border border-[var(--input-border)] p-2"><summary className="cursor-pointer text-sm font-semibold">Slat editor</summary><div className="mt-3 grid gap-3">
-              <NumberField label="Patch width · metres" value={asset.editor?.preview?.groundPatchMeters ?? 4} step={0.5} min={1} max={8} onChange={groundPatchMeters => updateAsset(current => ({ ...current, editor: { ...current.editor, preview: { ...current.editor?.preview, groundPatchMeters } } }))} />
+              <NumberField label="Patch width · meters" value={asset.editor?.preview?.groundPatchMeters ?? 4} step={0.5} min={1} max={8} onChange={groundPatchMeters => updateAsset(current => ({ ...current, editor: { ...current.editor, preview: { ...current.editor?.preview, groundPatchMeters } } }))} />
               <NumberField label="Population seed" value={asset.editor?.preview?.populationSeed ?? 1} step={1} min={0} max={4294967295} onChange={populationSeed => updateAsset(current => ({ ...current, editor: { ...current.editor, preview: { ...current.editor?.preview, populationSeed } } }))} />
               <ColorField label="Vegetation slat color" value={asset.species.lod.farColor ?? asset.species.materials[asset.species.parts[0].materialId].baseColor} onChange={farColor => updateAsset(current => ({ ...current, species: { ...current.species, lod: { ...current.species.lod, farColor } } }))} />
               <NumberField label="Vegetation slat strength" value={asset.species.lod.farStrength ?? 0.5} step={0.05} min={0} max={1} onChange={farStrength => updateAsset(current => ({ ...current, species: { ...current.species, lod: { ...current.species.lod, farStrength } } }))} />
               <GrassLodEditor grass={grass} onChange={updateGrass} />
+            </div></details>
+            <details className="rounded-md border border-[var(--input-border)] p-2"><summary className="cursor-pointer text-sm font-semibold">Cut appearance</summary><div className="mt-3 grid gap-3">
+              <SelectField label="Cut style" value={asset.species.cutAppearance?.style ?? "stems"} options={[{ value: "stems", label: "Stems" }, { value: "grass", label: "Grass stubble" }]} onChange={style => updateAsset(current => ({ ...current, species: { ...current.species, cutAppearance: { height: 0.085, ...current.species.cutAppearance, style: style as "stems" | "grass" } } }))}/>
+              <NumberField label="Cut height · meters" value={asset.species.cutAppearance?.height ?? 0.085} min={0.01} max={0.3} step={0.005} onChange={height => updateAsset(current => ({ ...current, species: { ...current.species, cutAppearance: { style: "stems", ...current.species.cutAppearance, height } } }))}/>
+              <ColorField label={asset.species.cutAppearance?.style === "grass" ? "Cut tint" : "Cut color"} value={asset.species.cutAppearance?.color ?? (asset.species.cutAppearance?.style === "grass" ? "#ffffff" : asset.species.materials.stem?.baseColor ?? "#486d2f")} onChange={color => updateAsset(current => ({ ...current, species: { ...current.species, cutAppearance: { style: "stems", height: 0.085, ...current.species.cutAppearance, color } } }))}/>
             </div></details>
             <AddPhrasePalette materials={Object.keys(asset.species.materials)} onAdd={addRootPhrase} />
             <div className="grid gap-1">
@@ -864,8 +869,8 @@ function GrassLodEditor({ grass, onChange }: { grass: GrassLodSettings; onChange
         Slat density {Math.round(grass.density * 100)}%
         <input type="range" min={0.05} max={3} step={0.01} value={grass.density} onChange={(event) => onChange({ density: Number(event.currentTarget.value) })} />
       </FormLabel>
-      <SelectField label="Coverage pattern" value={grass.pattern ?? "stripes"} options={[{ value: "stripes", label: "Stripes" }, { value: "dots", label: "Dots" }]} onChange={pattern => onChange({ pattern: pattern as "stripes" | "dots" })}/>
-      <NumberField label="Pattern scale · metres" value={grass.patternScale ?? 0.8} min={0.1} max={10} step={0.1} onChange={patternScale => onChange({ patternScale })}/>
+      <SelectField label="Coverage pattern" value={grass.pattern ?? "natural"} options={[{ value: "natural", label: "Natural" }, { value: "stripes", label: "Stripes" }, { value: "dots", label: "Dots" }]} onChange={pattern => onChange({ pattern: pattern as GrassLodSettings["pattern"] })}/>
+      <NumberField label="Pattern scale · meters" value={grass.patternScale ?? 0.8} min={0.1} max={10} step={0.1} onChange={patternScale => onChange({ patternScale })}/>
       <ColorField label="Slat second top" value={grass.topColorB} onChange={(topColorB) => onChange({ topColorB })} />
       <ColorField label="Slat middle" value={grass.midColor} onChange={(midColor) => onChange({ midColor })} />
       <ColorField label="Slat top" value={grass.topColorA} onChange={(topColorA) => onChange({ topColorA })} />

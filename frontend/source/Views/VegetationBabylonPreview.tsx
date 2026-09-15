@@ -13,7 +13,7 @@ export function VegetationBabylonPreview({ asset, grass, primitiveMeshes, select
   const elements = useRef(new Map<PreviewPaneId, HTMLElement>());
   const runtime = useRef<ReturnType<typeof createVegetationWorkspace> | undefined>(undefined);
   const [angles, setAngles] = useState<Record<PreviewPaneId, PreviewAngle>>({ plant: "perspective", half: "perspective", full: "perspective", "lod-half": "perspective", "lod-full": "perspective" });
-  const [surfaces, setSurfaces] = useState<Record<string, string>>({ plant: "plain" });
+  const [surfaces, setSurfaces] = useState<Record<string, string>>({ plant: "dirt" });
   const [coverages, setCoverages] = useState<Record<string, number>>({ "lod-half": 0.5, "lod-full": 1 });
   const [error, setError] = useState("");
   useEffect(() => {

@@ -63,7 +63,7 @@ test("clover and tulip recipes, branch layouts, and grass controls are connected
   await expect.poll(() => geometry(page)).not.toEqual(beforeLayout);
   await page.getByText("Slat editor", { exact: true }).click();
   let beforeGrass = (await previewState(page)).grass;
-  await page.getByRole("slider").fill("0.9");
+  await page.getByTestId("asset-species-panel-body").getByRole("slider").fill("0.9");
   await expect.poll(async () => (await previewState(page)).grass).not.toEqual(beforeGrass);
   for (const label of ["Vegetation slat color", "Slat second top", "Slat middle", "Slat top", "Slat bottom"]) {
     beforeGrass = (await previewState(page)).grass;

@@ -17,6 +17,9 @@ test("grass reference stays independent of vegetation tuning and each preview ca
   await expect.poll(async () => (await previewState(page)).grass[0].uniforms.grassTopColorA).toEqual(grass);
   await expect.poll(async () => (await previewState(page)).grass[1].uniforms.topColorA).toMatchObject({ r: 1, g: 0, b: 0 });
   await page.getByRole("button", { name: "Plant view options", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Dirt", exact: true })).toHaveAttribute("aria-current", "true");
+  await page.getByRole("menuitem", { name: "Grass", exact: true }).click();
+  await page.getByRole("button", { name: "Plant view options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Dirt", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.screenshot({ path: ".tmp/game-reference-preview.png" });

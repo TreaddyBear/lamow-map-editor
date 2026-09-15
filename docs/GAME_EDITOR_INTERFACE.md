@@ -9,6 +9,20 @@ of game blade geometry, tuning, color/noise helpers and grass/dirt textures insi
 renderer package. Its manifest records source hashes. This closes the editor reference-asset
 gap; the game still does not consume editor-authored vegetation or depend on the package.
 
+September 15 update: the separate **▶ Playtest** now has **Cut** (default), **Flowers**, **Grass**, and **Camera**.
+Cut adapts the game's mower pressure/re-aim/release behavior to a circular editor footprint;
+hover bends at fixed roots, while clicking mows. Flowers/Grass painting has no pressure effect;
+these are editor authoring tools,
+not game controls. Playtest-only coverage and cut masks are separate; the builder's comparison
+views remain inspection-only. These masks do not export to the game. The game retains its own mower footprint,
+terrain logic and runtime implementation; this is an interaction preview, not full parity.
+
+Cutting preserves the grass ground texture and leaves stubble even at 100% flower coverage.
+Optional `species.cutAppearance` saves stems/grass style, height, and color. The shared
+`createCutRemnants` API uses stem stumps or the game's four cut-grass silhouettes. Game grass
+already has stubble, but `fieldFlowers.ts` and `cloverPatch.ts` currently collapse their cut
+instances entirely. They still need integration; see the [current handoff](LAMOW_HANDOFF.md).
+
 ## Finding
 
 The map data has a real, manual path into the game. Authored vegetation currently stops at

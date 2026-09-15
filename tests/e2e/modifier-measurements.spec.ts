@@ -158,6 +158,8 @@ test("actual LOD mask shader covers the requested area and grows monotonically",
   const result=await page.evaluate(async radiusModule=>{
     const url=performance.getEntriesByType("resource").map(e=>e.name).find(n=>/\/@babylonjs_core\.js/.test(n))!;
     const {Effect}=await import(url),{coverageDotRadius}=await import(radiusModule);
+    const {createCoverageNoise,createCoverageMask}=await import(radiusModule.replace("coveragePattern.js","coverageNoise.js"));
+    const ranks=createCoverageNoise();
     const source=Effect.ShadersStore.vegetationSlatsFragmentShader;
     const mask=source.slice(source.indexOf("vec2 cell ="),source.indexOf("vec3 topMix ="));
     if(!mask.includes("dotRadius"))throw new Error("Production mask not found");
@@ -167,23 +169,28 @@ test("actual LOD mask shader covers the requested area and grows monotonically",
     const shader=(type:number,text:string)=>{const s=gl.createShader(type)!;gl.shaderSource(s,text);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)!);return s;};
     const build=(body:string)=>{
       const vertex=shader(gl.VERTEX_SHADER,"attribute vec2 p; varying vec2 uv; void main(){uv=(p+1.0)*0.5;gl_Position=vec4(p,0.0,1.0);}");
-      const fragment=shader(gl.FRAGMENT_SHADER,"precision highp float;varying vec2 uv;uniform float patternMode, patternScale, vegetationCoverage, dotRadius;const float PI=3.14159265359;void main(){vec3 vWorldPos=patternMode<0.5?vec3(uv.x*1.41421356237,0.0,0.0):vec3(uv.x,0.0,uv.y);"+body+"gl_FragColor=vec4(vec3(vegetation),1.0);}");
+      const fragment=shader(gl.FRAGMENT_SHADER,"precision highp float;varying vec2 uv;uniform float patternMode, patternScale, vegetationCoverage, dotRadius; uniform float fieldEnabled; uniform vec4 bounds; uniform sampler2D mowField, coverageNoise;const float PI=3.14159265359;void main(){vec3 vWorldPos=patternMode<0.5?vec3(uv.x*1.41421356237,0.0,0.0):vec3(uv.x,0.0,uv.y)*(patternMode>1.5?16.0:1.0);"+body+"gl_FragColor=vec4(vec3(vegetation),1.0);}");
       const p=gl.createProgram()!;gl.attachShader(p,vertex);gl.attachShader(p,fragment);gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p)!);return p;
     };
     // Compile the production mask itself; remove lighting only to read binary area.
-    const current=build(mask),legacy=build(mask.replace("dotRadius);","sqrt(vegetationCoverage / PI));"));
+    const current=build(mask),legacy=build(mask.replace("dotRadius)","sqrt(vegetationCoverage / PI))"));
+    const noise=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,noise);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);gl.viewport(0,0,256,256);
     const measure=(program:WebGLProgram,mode:number,coverage:number)=>{
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,128,128,0,gl.RGBA,gl.UNSIGNED_BYTE,createCoverageMask(coverage,ranks));
+      gl.generateMipmap(gl.TEXTURE_2D);gl.viewport(0,0,256,256);
       gl.useProgram(program);const location=gl.getAttribLocation(program,"p");gl.enableVertexAttribArray(location);gl.vertexAttribPointer(location,2,gl.FLOAT,false,0,0);
       for(const [name,value] of Object.entries({patternMode:mode,patternScale:1,vegetationCoverage:coverage,dotRadius:coverageDotRadius(coverage)}))gl.uniform1f(gl.getUniformLocation(program,name),value);
       gl.drawArrays(gl.TRIANGLES,0,3);const pixels=new Uint8Array(256*256*4);gl.readPixels(0,0,256,256,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
       return Uint8Array.from({length:256*256},(_,i)=>pixels[i*4]>128?1:0);
     };
-    const rows=[];for(const mode of [0,1]){let previous=new Uint8Array(256*256);for(const coverage of [0,0.1,0.25,0.5,0.75,0.8,0.9,0.95,0.99,1]){const pixels=measure(current,mode,coverage);rows.push({mode,coverage,actual:pixels.reduce((a,b)=>a+b,0)/pixels.length,monotonic:pixels.every((v,i)=>v>=previous[i])});previous=pixels;}}
+    const rows=[];for(const mode of [0,1,2]){let previous=new Uint8Array(256*256);for(const coverage of [0,0.1,0.25,0.5,0.75,0.8,0.9,0.95,0.99,1]){const pixels=measure(current,mode,coverage);rows.push({mode,coverage,actual:pixels.reduce((a,b)=>a+b,0)/pixels.length,monotonic:pixels.every((v,i)=>v>=previous[i])});previous=pixels;}}
+    const distant=[];for(const coverage of [0.1,0.25,0.5,0.75,0.9]){measure(current,2,coverage);gl.viewport(0,0,4,4);gl.drawArrays(gl.TRIANGLES,0,3);const pixels=new Uint8Array(64);gl.readPixels(0,0,4,4,gl.RGBA,gl.UNSIGNED_BYTE,pixels);let total=0;for(let i=0;i<64;i+=4)total+=pixels[i]/255;distant.push({coverage,actual:total/16});}
     const old=measure(legacy,1,0.99);gl.getExtension("WEBGL_lose_context")?.loseContext();
-    return {rows,old99:old.reduce((a,b)=>a+b,0)/old.length};
+    return {rows,distant,old99:old.reduce((a,b)=>a+b,0)/old.length};
   },"/@fs/"+process.cwd().replaceAll("\\","/")+"/packages/landscape-renderer/dist/vegetation/coveragePattern.js");
-  for(const row of result.rows){expect(Math.abs(row.actual-row.coverage)).toBeLessThan(0.004);expect(row.monotonic).toBe(true);}
+  for(const row of result.rows){expect(Math.abs(row.actual-row.coverage),JSON.stringify(row)).toBeLessThan(row.mode===2?0.02:0.004);expect(row.monotonic).toBe(true);}
   expect(result.old99).toBeLessThan(0.94);
-  console.log("LOD coverage measurements",result);
+  for(const row of result.distant)expect(Math.abs(row.actual-row.coverage)).toBeLessThan(0.01);
+  console.log("LOD mask maximum area error",Math.max(...result.rows.map(row=>Math.abs(row.actual-row.coverage))),"distant filtered coverage",result.distant);
 });

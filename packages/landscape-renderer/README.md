@@ -28,8 +28,10 @@ cache across layers; the editor uses it for five simultaneous camera viewports.
 dirt-normal textures are exported from `@lamow/landscape-renderer/assets/*`. Refresh the
 snapshot with `pnpm sync:game-assets` at the repository root; `assets/game-reference.json`
 records source hashes. Builds consume the snapshot and do not need an adjacent game folder.
-Mixed slats use opaque world-space stripes or dots with an adjustable scale; pattern edits
-only change shader uniforms.
+Mixed slats offer Natural breakup, stripes or dots with an adjustable scale. Natural
+thresholds a small noise mask before mipmapping to preserve coverage at distance.
+`createCutRemnants` supplies reusable stems or the game's four cut-grass silhouettes;
+hosts drive visibility from their own cut state. See the [LaMow handoff](../../docs/LAMOW_HANDOFF.md).
 
 See `docs/editor-integration.md` for the current editor-facing API.
 See `docs/porting.md` for the earlier field-flower wrapper sketch and its current-plan caveat.

@@ -107,6 +107,7 @@ export type VegetationSpeciesDefinition = {
     scale: RangeF;
   };
   coverage?: { plantsPerSquareMeter: number };
+  cutAppearance?: { style: "stems" | "grass"; height: number; color?: ColorHex };
   lod: {
     nearGeometry: "procedural" | "importedMesh";
     farRepresentation: "none" | "grassSlatTint" | "coloredSlats" | "billboard";
@@ -216,7 +217,7 @@ export type VegetationSpeciesAssetFile = {
 
 export type GrassLodSettings = {
   density: number;
-  pattern?: "stripes" | "dots";
+  pattern?: "stripes" | "dots" | "natural";
   patternScale?: number;
   preview50Color: ColorHex;
   preview100Color: ColorHex;
@@ -348,22 +349,24 @@ export function parseVegetationAsset(text: string): VegetationSpeciesAssetFile {
   validateRange(value.species.instanceRanges.yaw);
   validateRange(value.species.instanceRanges.scale);
   if (value.species.instanceRanges.scale.min < 0) throw new Error("Instance scale cannot be negative.");
-  if (value.species.coverage && (!Number.isFinite(value.species.coverage.plantsPerSquareMeter) || value.species.coverage.plantsPerSquareMeter <= 0)) throw new Error("100% coverage must be a positive number of plants per square metre.");
+  if (value.species.coverage && (!Number.isFinite(value.species.coverage.plantsPerSquareMeter) || value.species.coverage.plantsPerSquareMeter <= 0)) throw new Error("100% coverage must be a positive number of plants per square meter.");
+  const cut = value.species.cutAppearance;
+  if (cut && (!["stems", "grass"].includes(cut.style) || !Number.isFinite(cut.height) || cut.height < 0.01 || cut.height > 0.3 || (cut.color !== undefined && !/^#[0-9a-f]{6}$/i.test(cut.color)))) throw new Error("Cut appearance needs stems or grass, a height from 0.01 to 0.3 meters, and a valid color.");
   if (value.primitives !== undefined) {
     if (!Array.isArray(value.primitives) || value.primitives.length > 64) throw new Error("Expected a primitive library with at most 64 entries.");
     value.primitives.forEach(validateObjPrimitiveMesh);
     if (new Set(value.primitives.map((primitive) => primitive.id)).size !== value.primitives.length) throw new Error("Primitive ids must be unique.");
   }
   if (value.species.constructionRecipe) validateRecipeStructure(value.species.constructionRecipe);
-  if (value.editor?.grassLod?.pattern !== undefined && !["stripes", "dots"].includes(value.editor.grassLod.pattern)) throw new Error("Unknown slat coverage pattern.");
-  if (value.editor?.grassLod?.patternScale !== undefined && (!Number.isFinite(value.editor.grassLod.patternScale) || value.editor.grassLod.patternScale < 0.1 || value.editor.grassLod.patternScale > 10)) throw new Error("Slat pattern scale must be between 0.1 and 10 metres.");
+  if (value.editor?.grassLod?.pattern !== undefined && !["stripes", "dots", "natural"].includes(value.editor.grassLod.pattern)) throw new Error("Unknown slat coverage pattern.");
+  if (value.editor?.grassLod?.patternScale !== undefined && (!Number.isFinite(value.editor.grassLod.patternScale) || value.editor.grassLod.patternScale < 0.1 || value.editor.grassLod.patternScale > 10)) throw new Error("Slat pattern scale must be between 0.1 and 10 meters.");
   const grass = value.editor?.grassLod;
   if (grass?.density !== undefined && (!Number.isFinite(grass.density) || grass.density < 0.05 || grass.density > 3)) throw new Error("Slat density must be between 0.05 and 3.");
   for (const key of ["preview50Color", "preview100Color", "topColorA", "topColorB", "midColor", "bottomColor"] as const) {
     if (grass?.[key] !== undefined && !/^#[0-9a-f]{6}$/i.test(grass[key])) throw new Error(`Invalid slat color ${key}.`);
   }
   const preview = value.editor?.preview;
-  if (preview?.groundPatchMeters !== undefined && (!Number.isFinite(preview.groundPatchMeters) || preview.groundPatchMeters < 1 || preview.groundPatchMeters > 8)) throw new Error("Preview patch width must be between 1 and 8 metres.");
+  if (preview?.groundPatchMeters !== undefined && (!Number.isFinite(preview.groundPatchMeters) || preview.groundPatchMeters < 1 || preview.groundPatchMeters > 8)) throw new Error("Preview patch width must be between 1 and 8 meters.");
   if (preview?.populationSeed !== undefined && (!Number.isInteger(preview.populationSeed) || preview.populationSeed < 0 || preview.populationSeed > 4294967295)) throw new Error("Preview seed must be an unsigned 32-bit integer.");
   const species = ensureSpeciesRecipe(migrateLegacySpecies(value.species));
   validateSpecies(species);

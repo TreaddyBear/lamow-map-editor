@@ -1,8 +1,10 @@
-import { Color3, Effect, Mesh, ShaderMaterial, Vector2, Vector3, Vector4, VertexData, type Scene, type Texture } from "@babylonjs/core";
+import { Color3, Effect, Mesh, RawTexture, ShaderMaterial, Texture, Vector2, Vector3, Vector4, VertexData, type Scene } from "@babylonjs/core";
 import { gameGrassSettings as reference } from "./gameReference/settings.js";
 import type { GrassBake } from "./grassBake.js";
 import type { GrassLodSettings, VegetationSpeciesAssetFile } from "./assets.js";
 import { coverageDotRadius } from "./coveragePattern.js";
+import { createCoverageNoise, createCoverageMask } from "./coverageNoise.js";
+const coverageNoise = createCoverageNoise();
 
 /** Extracted from LaMow c35d779 grassSlats.ts. The shader and baked detail are the game's;
  * the host supplies patch bounds, terrain, masks and tuning instead of game globals. */
@@ -137,6 +139,7 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
       uniform float patternMode;
       uniform float patternScale;
       uniform float dotRadius;
+      uniform sampler2D coverageNoise;
       uniform vec3 topColorA;
       uniform vec3 topColorB;
       uniform vec3 midColor;
@@ -223,10 +226,12 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
         // Opaque spatial coverage: each fragment belongs to grass OR vegetation.
         // World-space masks remain stable when the camera orbits and cost no draw calls.
         vec2 cell = vWorldPos.xz / max(0.1, patternScale);
+        float coverage = vegetationCoverage;
         float pick = patternMode < 0.5
-          ? step(fract((cell.x + cell.y) * 0.70710678), vegetationCoverage)
-          : step(length(fract(cell) - 0.5), dotRadius);
-        float vegetation = vegetationCoverage <= 0.0 ? 0.0 : vegetationCoverage >= 1.0 ? 1.0 : pick;
+          ? step(fract((cell.x + cell.y) * 0.70710678), coverage)
+          : patternMode < 1.5 ? step(length(fract(cell) - 0.5), dotRadius)
+          : texture2D(coverageNoise, cell / 16.0).r;
+        float vegetation = coverage <= 0.0 ? 0.0 : coverage >= 1.0 ? 1.0 : pick;
         vec3 topMix = mix(mix(grassTopColorA, grassTopColorB, vColorPick), mix(topColorA, topColorB, vColorPick), vegetation);
         vec3 middle = mix(grassMidColor, midColor, vegetation);
         vec3 bottom = mix(grassBottomColor, bottomColor, vegetation);
@@ -269,9 +274,13 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
   const material = new ShaderMaterial("vegetation-slats-material-" + layerMask, scene, "vegetationSlats", {
     attributes: ["position", "normal", "uv", "groundY", "cover"],
     uniforms: ["grassTopColorA", "grassTopColorB", "grassMidColor", "grassBottomColor", "vegetationCoverage", "patternMode", "patternScale", "dotRadius", "worldViewProjection", "cameraPosition", "bounds", "slatHeight", "topColorA", "topColorB", "midColor", "bottomColor", "slatMidPoint", "skyAmbientColor", "skyAmbientIntensity", "lightDir", "tileScale", "normalStrength", "roughness", "specIntensity", "sheen", "cutoff", "wiggleAmp", "wiggleFreq", "bendAmp", "time", "windAmp", "windDirection", "lodFade", "lodCenter", "slatFadeDistance", "slatFadeBand", "slatMaxDistance"],
-    samplers: ["mowField", "grassNormal", "grassAlbedo"], needAlphaTesting: true,
+    samplers: ["mowField", "grassNormal", "grassAlbedo", "coverageNoise"], needAlphaTesting: true,
   });
   material.setTexture("mowField", mowTexture); material.setTexture("grassNormal", bake.normalTex); material.setTexture("grassAlbedo", bake.albedoTex);
+  const noise = RawTexture.CreateRGBATexture(createCoverageMask(0.5, coverageNoise), 128, 128, scene, true, false, Texture.TRILINEAR_SAMPLINGMODE);
+  let maskCoverage = 0.5;
+  noise.wrapU = noise.wrapV = Texture.WRAP_ADDRESSMODE;
+  material.setTexture("coverageNoise", noise);
   material.setVector4("bounds", new Vector4(-100, -100, 200, 200));
   material.setVector3("lightDir", new Vector3(-0.45, -1, 0.24).normalize());
   material.setVector2("windDirection", new Vector2(1, 0)); material.setVector2("lodCenter", Vector2.Zero());
@@ -283,8 +292,9 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
   return {
     mesh,
     update(asset: VegetationSpeciesAssetFile, grass: GrassLodSettings, width: number, coverage: number) {
+      if (maskCoverage !== coverage) { noise.update(createCoverageMask(coverage, coverageNoise)); maskCoverage = coverage; }
       material.setFloat("vegetationCoverage", coverage);
-      material.setFloat("patternMode", grass.pattern === "dots" ? 1 : 0);
+      material.setFloat("patternMode", grass.pattern === "stripes" ? 0 : grass.pattern === "dots" ? 1 : 2);
       material.setFloat("patternScale", grass.patternScale ?? 0.8);
       material.setFloat("dotRadius", coverageDotRadius(coverage));
       const strength = asset.species.lod.farStrength ?? 0.5;
@@ -325,6 +335,6 @@ export function createVegetationSlatLayer(scene: Scene, bake: GrassBake, mowText
       mesh.setVerticesData("cover", new Float32Array(positions.length / 3).fill(1), true, 1);
       geometryKey = key;
     },
-    dispose() { mesh.dispose(); material.dispose(); },
+    dispose() { mesh.dispose(); material.dispose(); noise.dispose(); },
   };
 }

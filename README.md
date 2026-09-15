@@ -2,7 +2,7 @@
 
 React map and vegetation authoring tools for LaMow. The editor runs separately from the game.
 Vegetation can be edited, exported, and checked in an independent Playtest scene. **The main
-game does not yet load these vegetation exports.** See the [current interface audit](docs/GAME_EDITOR_INTERFACE.md).
+game does not yet load these vegetation exports.** Start with the [LaMow handoff](docs/LAMOW_HANDOFF.md) when continuing in the game.
 
 ## Run and build
 
@@ -79,8 +79,9 @@ local server. [Storage details](assets/vegetation/README.md).
 ## Preview and coverage
 
 The left sidebar starts with **100% coverage · plants/m²**: complete generated plants or
-clusters per square metre. A 4 × 4 m patch at 153 clusters/m² has 2,448 clusters at 100%.
-Expand **Slat editor** below it to edit distant appearance. **Add** and the recipe follow.
+clusters per square meter. A 4 × 4 m patch at 153 clusters/m² has 2,448 clusters at 100%.
+Expand **Slat editor** below it to edit distant appearance. **Cut appearance** chooses stems
+or grass stubble, height, and color/tint for Playtest; it saves with the archetype. **Add** and the recipe follow.
 The inspector on the right edits the highlighted recipe element. **Add** appends to the
 recipe; right-click a recipe item for **Add before / inside / after** submenus and Delete.
 
@@ -93,9 +94,29 @@ uses the game's long blade geometry, color variation, height tuning and calibrat
 LOD views show the interior of a wider field. Their vegetation palette is independent of
 the game's grass reference. Per-view menus provide camera angles and ground backgrounds;
 LOD menus also let you compare **100% grass**, **50% vegetation**, and **100% vegetation**.
-Mixed LOD uses opaque world-space **Stripes** or **Dots**, with a pattern scale in metres;
-it selects grass or vegetation at each surface point instead of blending their colors.
-Left-drag orbits, right-drag pans, and the wheel zooms. Reset asks in a small popover.
+Mixed LOD defaults to **Natural**: irregular, overlapping scales of breakup instead of a
+regular grid. **Stripes** and **Dots** remain available. Pattern scale is in meters; coverage
+uses an opaque spatial mask, with a narrow smoothed edge on Natural.
+
+The builder's five panes are inspection views. Left-drag orbits, right-drag pans, and the
+wheel zooms; camera Reset asks in a small popover. Their ground and coverage menus customize
+the display. They do not paint or mow.
+
+Open **▶ Playtest** in the top bar for the interactive preview. It starts with the authored
+patch and a surrounding lawn using the game's grass geometry and grass/dirt textures:
+
+- **Cut** (default): hover pushes plants away; click or drag mows flowers and grass.
+- **Flowers / Grass** paint that population and regrow the area, without pushing plants.
+- **Camera** lets left-drag turn the camera. Right-drag pans and the wheel zooms in every mode.
+- The small/large dots adjust brush size; the sharp/blurred circles adjust paint softness.
+- A red striped brush outside the lawn marks where painting/cutting cannot act.
+- **Restore plants** resets painted and cut areas after confirmation.
+
+Paint can add plants in the surrounding lawn as well as regrow the initial patch. Mowing
+retains the planted mask and ground texture. Cut grass remains under every cut area, including
+100% flowers; the Stems style also leaves short stalks. Playtest strokes are temporary:
+leaving Playtest, importing a species, or reloading resets them. They never alter the builder's
+comparison views, saved archetype versions, or Undo history.
 
 The grass/dirt textures and grass reference live in **packages/landscape-renderer**.
 Refresh them from the adjacent game working tree with:
@@ -110,9 +131,8 @@ the reference snapshot; ordinary editor builds need no game checkout. The snapsh
 records source hashes. This is a flat, stationary reference: game terrain masks, decorative
 grass, shadows, wind animation and mowing transitions still belong to the game.
 
-The **Play** triangle opens an independent mowing check: left-drag mows, right-drag orbits,
-wheel zooms, **Restore plants** resets, **Back to assets** returns to the draft. It is not
-the main game. The game-side asset loader remains the next integration boundary.
+**Back to assets** returns to the draft. Playtest is independent of the main game; the
+game-side asset loader and mowing adapter remain the next integration boundary.
 
 ## Maps are a separate export
 
@@ -138,6 +158,7 @@ a TypeScript file that is not the current normal game loading path.
   [storage details](assets/vegetation/README.md).
 - `tests/fixtures/authored-clover.lamow-vegetation.json` — unchanged snapshot of the clover
   export supplied September 12, used to verify the real handoff. It does not replace defaults.
+- [LaMow handoff](docs/LAMOW_HANDOFF.md) — where to resume game integration, shared APIs, and checks.
 - [Game/editor interface audit](docs/GAME_EDITOR_INTERFACE.md) — actual connections, gaps,
   and the eventual game integration path.
 - [Renderer API](packages/landscape-renderer/docs/editor-integration.md) — embedding in a host.

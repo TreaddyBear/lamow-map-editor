@@ -12,6 +12,87 @@ import { stemGrowthVector } from "../packages/landscape-renderer/dist/vegetation
 import { createReferenceGrass } from "../packages/landscape-renderer/dist/vegetation/referenceGrass.js";
 import { gameBladeGeometry, gameBladesPerSquareMeter, gameGrassSettings } from "../packages/landscape-renderer/dist/vegetation/gameReference/settings.js";
 import { generationContractCases, generationFingerprint } from "./helpers/generation-contract.mjs";
+import {createPreviewField} from "../packages/landscape-renderer/dist/vegetation/previewField.js";
+import {createBrushMotion} from "../packages/landscape-renderer/dist/vegetation/brushMotion.js";
+import {createCoverageNoise,createCoverageMask} from "../packages/landscape-renderer/dist/vegetation/coverageNoise.js";
+import {createCutRemnants} from "../packages/landscape-renderer/dist/vegetation/cutRemnants.js";
+
+test("soft paint has a smooth spatial falloff, stays stable under repeated strokes, and preserves cut coverage",()=>{
+  const field=createPreviewField(4,0,256),p={x:0,z:0};
+  field.stroke(p,p,1,"flowers",0.7);
+  const samples=[0,0.25,0.5,0.75,0.95,1.05].map(x=>field.sample(x,0).density);
+  assert.equal(samples[0],1);assert.equal(samples[1],1);assert.ok(samples[2]<1&&samples[2]>samples[3]);assert.ok(samples[3]>samples[4]&&samples[4]>0);assert.equal(samples[5],0);
+  assert.equal(field.stroke(p,p,1,"flowers",0.7),false,"holding still must not turn a soft edge into a hard edge");
+  const planted=field.sample(0.5,0).density;field.stroke(p,p,1,"cut");assert.deepEqual(field.sample(0.5,0),{density:planted,cut:true});
+  field.stroke(p,p,1,"grass",0.7);assert.equal(field.sample(0,0).density,0);assert.equal(field.sample(0,0).cut,false);
+  assert.throws(()=>field.stroke(p,p,1,"flowers",NaN));
+});
+
+test("cut appearances round-trip and submit visible stems or game stubble at the requested height",()=>{
+  const definition=structuredClone(defaultVegetationAsset);definition.species.cutAppearance={style:"stems",height:0.06,color:"#668833"};
+  assert.deepEqual(parseVegetationAsset(JSON.stringify(definition)).species.cutAppearance,definition.species.cutAppearance);
+  const engine=new NullEngine(),scene=new Scene(engine),positions=[{x:1,z:2,y:0.4},{x:3,z:4,y:0.5}];
+  const layer=createCutRemnants(scene,positions,definition.species.cutAppearance);
+  layer.setVisible(i=>i===0);const mesh=layer.meshes[0];assert.equal(mesh.thinInstanceCount,1);assert.equal(mesh.isEnabled(),true);
+  const matrix=mesh.thinInstanceGetWorldMatrices()[0];assert.ok(Math.abs(matrix.m[5]-0.06)<1e-7);assert.ok(Math.abs(matrix.m[13]-0.4)<1e-7);
+  layer.setVisible(()=>false);assert.equal(mesh.isEnabled(),false);layer.setVisible(()=>true);assert.equal(mesh.thinInstanceCount,2);
+  const grass=createCutRemnants(scene,positions,{style:"grass",height:0.085});grass.setVisible(()=>true);assert.equal(grass.meshes.reduce((n,m)=>n+m.thinInstanceCount,0),2);
+  assert.ok(grass.meshes.every(m=>m.getVerticesData("position").every(Number.isFinite)));
+  assert.throws(()=>createCutRemnants(scene,positions,{style:"stems",height:NaN}));
+  definition.species.cutAppearance.height=0;assert.throws(()=>parseVegetationAsset(JSON.stringify(definition)));
+  layer.dispose();grass.dispose();scene.dispose();engine.dispose();
+});
+
+test("preview masks separate coverage from cutting, interpolate fast strokes, and paint regrows",()=>{
+  const field=createPreviewField(4,0.5);
+  assert.deepEqual(field.sample(0,0),{density:0.5,cut:false});
+  assert.equal(field.stroke({x:-1,z:0},{x:1,z:0},0.2,"cut"),true);
+  for(const x of [-0.9,0,0.9])assert.deepEqual(field.sample(x,0),{density:0.5,cut:true});
+  assert.deepEqual(field.sample(0,1),{density:0.5,cut:false});
+  field.stroke({x:0,z:0},{x:0,z:0},0.2,"grass");assert.deepEqual(field.sample(0,0),{density:0,cut:false});
+  field.stroke({x:0,z:0},{x:0,z:0},0.2,"flowers");assert.deepEqual(field.sample(0,0),{density:1,cut:false});
+  const before=field.revision;assert.equal(field.stroke({x:0,z:0},{x:0,z:0},0.2,"flowers"),false);assert.equal(field.revision,before);
+  field.reset();assert.deepEqual(field.sample(0,0),{density:0.5,cut:false});
+  assert.throws(()=>field.stroke({x:NaN,z:0},{x:0,z:0},1,"cut"));
+});
+
+test("brush motion leans away at fixed roots without cutting on hover and settles after leaving",()=>{
+  const engine=new NullEngine(),scene=new Scene(engine),definition=structuredClone({...defaultVegetationAsset,primitives:defaultObjPrimitiveLibrary()});
+  const layer=createVegetationSpeciesLayer({scene,asset:definition,groundHeightAt:()=>0});
+  layer.setPlants([{x:0.1,z:0,seed:1},{x:1,z:0,seed:1}]);
+  const field=createPreviewField(4,1),mesh=layer.meshes[0],colors=new Float32Array([1,0,0,1,0,1,0,1]);mesh.thinInstanceSetBuffer("color",colors,4,false);
+  const motion=createBrushMotion(mesh,"plant",[0.1,0.9],[{kind:"color",stride:4,data:colors}]);
+  const original=mesh.thinInstanceGetWorldMatrices().map(m=>[...m.asArray()]);
+  motion.applyField(field);motion.hover({x:0,z:0},0.45);
+  for(let i=0;i<30;i++)motion.tick(1/60);
+  const pressed=mesh.thinInstanceGetWorldMatrices().map(m=>[...m.asArray()]);
+  assert.equal(motion.visibleCount,2);assert.equal(field.revision,0);
+  assert.deepEqual(pressed[0].slice(12,15),original[0].slice(12,15));assert.ok(pressed[0][4]>original[0][4],"up axis leans away toward +X");
+  assert.deepEqual(pressed[1],original[1]);
+  motion.hover(undefined);for(let i=0;i<240;i++)motion.tick(1/60);
+  assert.deepEqual(mesh.thinInstanceGetWorldMatrices().map(m=>[...m.asArray()]),original);
+  field.stroke({x:0,z:0},{x:0,z:0},0.45,"cut");motion.applyField(field);assert.equal(motion.visibleCount,1);
+  assert.equal(mesh.thinInstanceCount,1,"cut plants are excluded from drawing, not submitted with zero transforms");
+  assert.deepEqual([...mesh.thinInstanceGetWorldMatrices()[0].asArray()],original[1]);
+  assert.deepEqual([...colors.slice(0,4)],[0,1,0,1],"color stays attached to the surviving plant");
+  field.stroke({x:0,z:0},{x:0,z:0},0.45,"flowers");motion.applyField(field);
+  assert.equal(mesh.thinInstanceCount,2);assert.deepEqual(mesh.thinInstanceGetWorldMatrices().map(m=>[...m.asArray()]),original);
+  assert.deepEqual([...colors],[1,0,0,1,0,1,0,1],"regrowing restores the original color identities");
+  motion.restore();layer.dispose();scene.dispose();engine.dispose();
+});
+
+test("natural coverage texture has uniform area ranks and repeatable multi-scale breakup",()=>{
+  const a=createCoverageNoise(),b=createCoverageNoise();assert.deepEqual(a,b);
+  const histogram=Array(256).fill(0);for(let i=0;i<a.length;i+=4)histogram[a[i]]++;
+  assert.ok(histogram.every(n=>n===64));
+  let equalNeighbors=0;for(let i=0;i<128*128-1;i++)if(a[i*4]===a[(i+1)*4])equalNeighbors++;
+  assert.ok(equalNeighbors<128*128*0.2,"large constant geometric cells should not dominate");
+  for(const coverage of [0,0.1,0.25,0.5,0.75,0.9,1]) {
+    const mask=createCoverageMask(coverage,a);let total=0;
+    for(let i=0;i<mask.length;i+=4){assert.ok(mask[i]===0||mask[i]===255);total+=mask[i]/255;}
+    assert.ok(Math.abs(total/(128*128)-coverage)<0.002,"thresholded mask preserves area before distance filtering");
+  }
+});
 
 test("generation version 1 preserves established output fingerprints across 48 saved cases",()=>{
   const expected=JSON.parse(readFileSync(new URL("./fixtures/generation-v1.json",import.meta.url),"utf8"));
@@ -26,6 +107,7 @@ test("generation version 1 preserves established output fingerprints across 48 s
 test("game reference uses real blade geometry, calibrated area and repeatable instances without allocating during recipe edits", () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   const layer = createReferenceGrass(scene); layer.update(4, 0.5, 3);
+  assert.equal(layer.mesh._thinInstanceDataStorage.matrixBuffer.isUpdatable(),true,"mowing and pressure must update the rendered grass");
   assert.deepEqual([...layer.mesh.getVerticesData("position")], gameBladeGeometry.positions);
   assert.equal(layer.mesh.thinInstanceCount, Math.round(16 * gameBladesPerSquareMeter * 0.5));
   const matrices = layer.mesh.thinInstanceGetWorldMatrices().map(matrix => [...matrix.asArray()]);

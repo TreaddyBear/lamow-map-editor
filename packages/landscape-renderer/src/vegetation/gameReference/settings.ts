@@ -30,7 +30,10 @@ export const gameGrassSettings = {
   "lodSlatColorMid": 0.4,
   "lodNormalStrength": 0.85,
   "skyAmbientIntensity": 0.22,
-  "skyAmbientColor": "#94bfff"
+  "skyAmbientColor": "#94bfff",
+  "cutGrassRootColor": "#2d2e00",
+  "cutGrassTopColorA": "#869325",
+  "cutGrassTopColorB": "#42a60c"
 };
 export const gameBladeGeometry = {
   "positions": [

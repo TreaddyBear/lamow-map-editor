@@ -86,9 +86,10 @@ this slice: port the renderer as well as the JSON.
 Flat base color, alpha, emissive color/strength and OBJ vertex colors render. Surface-gradient
 metadata and per-vertex emissive definitions are retained but are not implemented here.
 Grass/slat previews remain flat editor references. Mixed coverage uses opaque world-space
-stripes or dots, authored in `editor.grassLod.pattern` and `patternScale` (metres). The shader
+Natural breakup (default), stripes or dots, authored in `editor.grassLod.pattern` and `patternScale` (meters). The shader
 selects the reference grass or vegetation palette per fragment; it does not average their
-colors or enable alpha blending. Pattern edits update uniforms without rebuilding geometry.
+colors or enable alpha blending. Pattern edits update uniforms without rebuilding geometry;
+Natural coverage updates a small thresholded, mipmapped mask to retain coverage at distance.
 Automatic LOD switching, protected
 tulip interactions, and other shape-only species are outside this handoff slice.
 
@@ -96,3 +97,19 @@ Drafts persist locally across page changes and reloads; exported JSON remains th
 handoff. Primitive edits belong to the selected species; each export embeds its current library.
 The playtest imports that library into an independent scene. For the current game-side audit
 and clover-first migration, see [the interface audit](../../../docs/GAME_EDITOR_INTERFACE.md).
+
+## Cut appearance and interactive preview
+
+`species.cutAppearance` optionally stores `{ style: "stems" | "grass", height, color? }`.
+Height is 0.01–0.3 meters and color is six-digit RGB hex. Existing assets default in Playtest
+to 0.085-meter stems using the stem material color, over 0.05-meter grass stubble.
+`createCutRemnants` from `@lamow/landscape-renderer/vegetation/cutRemnants` builds reusable
+stem or cut-grass batches. The host supplies terrain placements and updates visibility from
+its cut state. This is separate from `createVegetationSpeciesLayer.mowCircle`; calling that
+method alone still hides standing plants without adding remnants. See the
+[LaMow handoff](../../../docs/LAMOW_HANDOFF.md) for the adapter contract.
+
+The editor's `vegetationPlaytestRuntime.ts` composes these layers with an editor-only field
+mask and brush. Coverage and cut state are independent. Painting changes populations and
+regrows them without pressure; Cut hover bends plants and clicking cuts them. Neither action
+changes terrain textures. Builder comparison panes do not use this input/mask system.

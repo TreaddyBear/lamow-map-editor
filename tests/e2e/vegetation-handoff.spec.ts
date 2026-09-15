@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
 test("the supplied clover export imports, opens Playtest, mows and returns with the draft intact", async ({ page }) => {
+  test.setTimeout(60_000);
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
   const file = "tests/fixtures/authored-clover.lamow-vegetation.json";
   await page.goto("/assets");
@@ -19,6 +20,7 @@ test("the supplied clover export imports, opens Playtest, mows and returns with 
   await page.mouse.down(); await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.6, { steps: 12 }); await page.mouse.up();
   await expect(page.getByRole("status")).not.toHaveText("2448 standing");
   await page.getByRole("button", { name: "Restore plants", exact: true }).click();
+  await page.getByRole("button", { name: "Reset patch", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("2448 standing");
   await page.screenshot({ path: ".tmp/authored-clover-playtest.png" });
   await page.getByRole("button", { name: "Back to assets", exact: true }).click();
@@ -63,6 +65,7 @@ test("edit, export, reload, import into playtest, mow and return without losing 
   await expect(page.getByRole("status")).not.toHaveText("400 standing");
   await page.screenshot({ path: ".tmp/vegetation-playtest.png" });
   await page.getByRole("button", { name: "Restore plants" }).click();
+  await page.getByRole("button", { name: "Reset patch", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("400 standing");
   await page.getByRole("button", { name: "Back to assets" }).click();
   await expect(page.getByTestId("asset-selector")).toHaveText("Handoff Flower");

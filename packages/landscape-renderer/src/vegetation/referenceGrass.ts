@@ -13,13 +13,14 @@ export function createReferenceGrass(scene: Scene, layerMask = 2) {
   material.backFaceCulling = false; material.twoSidedLighting = true; mesh.material = material;
   const data = new VertexData(); Object.assign(data, gameBladeGeometry); data.applyToMesh(mesh);
   const base = color3ToHsl(Color3.FromHexString(settings.grassBaseColor));
-  let key = "";
+  let key = "", colors = new Float32Array(0);
   return {
     mesh,
+    get colors() { return colors; },
     update(width: number, coverage = 0.5, seed = 1) {
       const next = `${width}:${coverage}:${seed}`; if (key === next) return;
       const count = Math.round(width * width * gameBladesPerSquareMeter * coverage);
-      const matrices = new Float32Array(count * 16), colors = new Float32Array(count * 4);
+      const matrices = new Float32Array(count * 16); colors = new Float32Array(count * 4);
       for (let i = 0; i < count; i++) {
         const x = (randomHash(i + seed, 1) - 0.5) * width, z = (randomHash(i + seed, 2) - 0.5) * width;
         const noise = grassNoiseAt(x, z);
@@ -31,7 +32,7 @@ export function createReferenceGrass(scene: Scene, layerMask = 2) {
         colors.set([color.r, color.g, color.b, 1], i * 4);
       }
       mesh.setEnabled(count > 0);
-      mesh.thinInstanceSetBuffer("matrix", matrices, 16, true); mesh.thinInstanceSetBuffer("color", colors, 4, true);
+      mesh.thinInstanceSetBuffer("matrix", matrices, 16, false); mesh.thinInstanceSetBuffer("color", colors, 4, false);
       if (count) mesh.thinInstanceRefreshBoundingInfo(); key = next;
     },
     dispose() { mesh.dispose(); material.dispose(); },

@@ -42,7 +42,7 @@ export function createVegetationWorkspace(canvas: HTMLCanvasElement, elements: M
         normal.level = gameGrassSettings.dirtNormalStrength; material.bumpTexture = normal;
       }
     }
-    mesh.material = material; mesh.layerMask = index === 0 ? 1 : index === 1 ? 30 : 0; return mesh;
+    mesh.material = material; mesh.layerMask = index === 2 ? 1 : index === 1 ? 30 : 0; return mesh;
   });
   const layers = [1, 2, 4].map(layerMask => createVegetationSpeciesLayer({ scene, asset: initial, groundHeightAt: () => 0, layerMask, geometryCache: cache }));
   const bake = createGrassBake(scene);
