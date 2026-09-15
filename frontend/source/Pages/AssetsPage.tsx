@@ -386,9 +386,6 @@ function AssetEditor({ onOpenMapEditor, onPlaytest, catalog, libraryError, onSta
               <NumberField label="Vegetation slat strength" value={asset.species.lod.farStrength ?? 0.5} step={0.05} min={0} max={1} onChange={farStrength => updateAsset(current => ({ ...current, species: { ...current.species, lod: { ...current.species.lod, farStrength } } }))} />
               <GrassLodEditor grass={grass} onChange={updateGrass} />
             </div></details>
-            <details className="rounded-md border border-[var(--input-border)] p-2"><summary className="cursor-pointer text-sm font-semibold">Population</summary><div className="mt-3 grid gap-3">
-              <VariationField circular label="Plant rotation" value={{ ideal: (asset.species.instanceRanges.yaw.min + asset.species.instanceRanges.yaw.max) * 90 / Math.PI, deviation: (asset.species.instanceRanges.yaw.max - asset.species.instanceRanges.yaw.min) * 90 / Math.PI }} step={1} min={-360} max={360} onChange={({ ideal, deviation }) => updateAsset(current => ({ ...current, species: { ...current.species, instanceRanges: { ...current.species.instanceRanges, yaw: { min: (ideal - deviation) * Math.PI / 180, max: (ideal + deviation) * Math.PI / 180 } } } }))} />
-            </div></details>
             <AddPhrasePalette materials={Object.keys(asset.species.materials)} onAdd={addRootPhrase} />
             <div className="grid gap-1">
               {recipe.root.length ? (

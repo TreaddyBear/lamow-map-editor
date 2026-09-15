@@ -17,9 +17,6 @@ headings to check the travel rather than just comparing the endpoints.
 
 - **Arc direction** chooses the plane the stem bends in. It is not an axial twist
   of the entire source mesh and flower. **Arc degrees** controls how far it bends.
-- **Population → Plant rotation** rotates the entire finished plant around its base,
-  including its bent stem and attached flowers. It affects the near patch and Playtest;
-  the isolated editing view stays unrotated so component edits remain easy to compare.
 - **±0°** is a fixed heading. **±90°** covers a half circle. **±180°** covers a full
   circle. **Any direction** sets ±180°; clicking it again returns to a fixed heading
   at Ideal. Ideal remains available when returning to a narrower sector.
@@ -184,7 +181,6 @@ sample. Cup/Curl default to zero. Creation defaults can differ from these import
 | 100% coverage | 0.1…200 **complete plants/clusters per m²**, step 0.5. Count is `round(rate × patch area × density fraction)`. Not percentage of pixels covered by leaves. | Bench verifies exact counts and stable subsets. |
 | Patch size | 1…8 m, step 0.5; square side length | Area grows quadratically, not linearly. Bench checks boundary placement/counts. |
 | Seed | 0…4,294,967,295 integer | Deterministic placement/variant selection; repetition of shape is expected with 16 variants. |
-| Population → Plant rotation | Ideal −360…360°; ±0…180°; step 1° | Rotates the whole plant about its base. Any direction selects a full random turn. Actual 4,096-flower populations are checked for compass coverage after applying instance transforms. |
 | Slat density | 0.05…3, step 0.01 | Multiplies distant slat geometry density. Independent of near-plant coverage calibration. Existing browser tests check buffer changes; this bench does not certify perceived LOD equivalence. |
 | Coverage pattern / scale | stripes or dots; 0.1…10 m, step 0.1 | Opaque grass/vegetation surface selection. Scale changes pattern size, not opacity. GPU mask measurements verify requested area within 0.4 percentage points at 256² resolution, including high-density dots. |
 | Slat palette / vegetation far color | RGB hex; far-color strength 0…1, step 0.05 | Changes distant appearance. Material/vertex color, lighting and the pattern affect the displayed pixel. No colorimetric/GPU proof is claimed here. |

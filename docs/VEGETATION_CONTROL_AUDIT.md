@@ -1,5 +1,8 @@
 # Vegetation editor corrective pass
 
+The added Population / Plant rotation control was subsequently removed at the user's
+request. Direction and deviance remain on the existing Grow and Branch controls.
+
 ## September 14 composition audit: stability before refining assets
 
 This pass tests meaning across components and editing workflows, in addition to

@@ -84,9 +84,8 @@ Expand **Slat editor** below it to edit distant appearance. **Add** and the reci
 The inspector on the right edits the highlighted recipe element. **Add** appends to the
 recipe; right-click a recipe item for **Add before / inside / after** submenus and Delete.
 
-Expand **Population** for **Plant rotation**, which rotates whole plants around their
-bases in the patches and Playtest. **Any direction** selects a 360° random span (±180°).
-The same shortcut is available for a Grow's bend direction and a Branch's around-axis
+Direction and deviance are edited on Grow and Branch components. **Any direction**
+selects a 360° random span (±180°) for a Grow's bend direction or a Branch's around-axis
 angle. [Direction, bend and deviation explained](docs/VEGETATION_MODIFIERS.md#a-turn-a-bend-and-a-random-heading).
 
 Five views share one rendering engine and stop drawing while idle. The mixed near patch
