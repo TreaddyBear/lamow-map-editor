@@ -32,19 +32,34 @@ export function createVegetationSpeciesLayer(input: {
   };
   const refresh = () => {
     for (const batch of batches) {
+      const previousCount = batch.mesh.thinInstanceCount;
+      const worldMatrices = batch.mesh.thinInstanceGetWorldMatrices();
+      // Allow writes anywhere in the retained capacity before compacting the draw count.
+      batch.mesh.thinInstanceCount = batch.plantIndices.length;
+      let count = 0;
       let changed = false;
-      batch.plantIndices.forEach((plantIndex, i) => {
-        const collapsed = mowed.has(plantIndex) || hidden.has(plantIndex);
-        const offset = i * 16;
-        for (let j = 0; j < 16; j++) {
-          if (batch.buffer[offset + j] === (collapsed ? 0 : batch.source[offset + j])) continue;
-          // Update Babylon's CPU matrix cache as well as its GPU buffer.
-          batch.mesh.thinInstanceSetMatrixAt(i, collapsed ? Matrix.Zero() : Matrix.FromArray(batch.source, offset), false);
+      batch.plantIndices.forEach((plantIndex, index) => {
+        if (mowed.has(plantIndex) || hidden.has(plantIndex)) return;
+        const sourceOffset = index * 16;
+        const targetOffset = count * 16;
+        for (let component = 0; component < 16; component++) {
+          if (count < previousCount && batch.buffer[targetOffset + component] === batch.source[sourceOffset + component]) continue;
+          const matrix = worldMatrices[count] ?? Matrix.Identity();
+          Matrix.FromArrayToRef(batch.source, sourceOffset, matrix);
+          batch.mesh.thinInstanceSetMatrixAt(count, matrix, false);
           changed = true;
           break;
         }
+        count++;
       });
-      if (changed) { batch.mesh.thinInstanceBufferUpdated("matrix"); batch.mesh.thinInstanceRefreshBoundingInfo(); }
+      batch.mesh.thinInstanceCount = count;
+      batch.mesh.setEnabled(count > 0);
+      // Invalidate Babylon's cached world matrices after direct count changes.
+      batch.mesh.thinInstanceGetWorldMatrices().length = count;
+      if (count && (changed || count !== previousCount)) {
+        batch.mesh.thinInstanceBufferUpdated("matrix");
+        batch.mesh.thinInstanceRefreshBoundingInfo(true);
+      }
     }
   };
   const rebuild = (placementsChanged = false) => {

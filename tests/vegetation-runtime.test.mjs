@@ -323,15 +323,15 @@ test("mowing and visibility survive edits; reset, empty populations and disposal
   const before = snapshot(layer);
   assert.equal(layer.mowCircle(1, 0, 0.5), 1);
   assert.equal(layer.mowCircle(1, 0, 0.5), 0);
-  assert.ok(snapshot(layer).every((batch) => batch.matrices[0].every((value) => value === 0)));
+  assert.ok(snapshot(layer).every((batch) => batch.matrices.length === 1 && batch.matrices[0][12] === 5));
   layer.setVisible(0, true);
   assert.notDeepEqual(snapshot(layer), before);
   layer.setAsset(asset());
-  assert.ok(snapshot(layer).every((batch) => batch.matrices[0].every((value) => value === 0)));
+  assert.ok(snapshot(layer).every((batch) => batch.matrices.length === 1 && batch.matrices[0][12] === 5));
   layer.resetMowed(); assert.deepEqual(snapshot(layer), before);
   layer.setVisible(1, false); layer.setVisible(1, true); assert.deepEqual(snapshot(layer), before);
   layer.syncVisibility(1, 0, 1);
-  assert.ok(snapshot(layer).every((batch) => batch.matrices[1].every((value) => value === 0)));
+  assert.ok(snapshot(layer).every((batch) => batch.matrices.length === 1 && batch.matrices[0][12] === 1));
   layer.syncVisibility(1, 0, 10); assert.deepEqual(snapshot(layer), before);
   for (let i = 0; i < 5; i++) layer.setAsset(asset());
   assert.equal(scene.meshes.length, 3); assert.equal(scene.materials.filter((m) => m.name.startsWith("species-")).length, 3);
