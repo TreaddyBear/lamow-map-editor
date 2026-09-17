@@ -127,6 +127,14 @@ The main game's unrelated local changes must be preserved throughout the port.
 
 ## Map transfer details
 
+September 17 editor update: a read-only `/api/game-maps` bridge opens the adjacent game's
+authored source in dev and preview. The top-bar level selector and game-startup star expose
+pack navigation/default selection. Browser drafts persist, source refresh never overwrites
+edits, and the bridge compares the authored hash with the baked artifact. This is file-state
+reporting, not live synchronization with the level currently selected in a running game.
+Exports preserve `defaultLevelCode` and `fullCode`, download the whole pack as `lawn-maps.json`,
+and reject baked artifacts on import. The transfer/rebake step below remains explicit.
+
 The normal game path is:
 
 ```text

@@ -8,7 +8,7 @@
     "build:renderer": "pnpm --filter @lamow/landscape-renderer build",
     "build": "pnpm build:renderer && tsc && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5191",
-    "test": "pnpm build:renderer && vite build --ssr tests/domain.test.ts --outDir .tmp/domain-tests --emptyOutDir && node --test .tmp/domain-tests/domain.test.js && node --test tests/vegetation-runtime.test.mjs tests/vegetation-library.test.mjs tests/vegetation-modifiers.test.mjs",
+    "test": "pnpm build:renderer && vite build --ssr tests/domain.test.ts --outDir .tmp/domain-tests --emptyOutDir && node --test .tmp/domain-tests/domain.test.js && node --test tests/vegetation-runtime.test.mjs tests/vegetation-library.test.mjs tests/vegetation-modifiers.test.mjs tests/game-maps.test.mjs",
     "audit:modifiers": "pnpm build:renderer && node scripts/audit-vegetation-modifiers.mjs",
     "test:e2e": "pnpm build:renderer && playwright test",
     "test:e2e:headed": "pnpm build:renderer && playwright test --headed",

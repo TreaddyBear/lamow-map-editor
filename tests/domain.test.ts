@@ -3,6 +3,31 @@ import { advanceNumberHold, createNumberHoldCurve, numberFractionPadding } from 
 import assert from "node:assert/strict";
 import { mergeArchetypeCatalog } from "../frontend/source/utilities/assets/versionLibrary";
 import { defaultVegetationAsset } from "../frontend/source/utilities/assets/vegetation";
+import { levelIndex, nextLevelCode, readMapWorkspace } from "../frontend/source/utilities/editor/mapWorkspace";
+import { updateCurrentLevel } from "../frontend/source/utilities/editor/utils";
+
+test("map import/export preserves game startup references and full level identities; baked files are rejected", () => {
+  const pack = clone(defaultPack); pack.defaultLevelCode = "game-exact"; pack.levels[0].fullCode = "game-exact";
+  const result = exportJsonValue(importJsonText(JSON.stringify(pack)).pack);
+  assert.equal(result.defaultLevelCode, "game-exact"); assert.equal(result.levels[0].fullCode, "game-exact"); assert.equal(levelIndex(result, "game-exact"), 0);
+  assert.throws(() => importJsonText(JSON.stringify({ bakedVersion: 2, maps: [] })), /lawn-maps.json/);
+});
+
+test("map drafts recover selection and baseline, avoid duplicate level codes, and preserve corrupt storage", () => {
+  const pack = clone(defaultPack); pack.levels[0].code = "level2";
+  assert.equal(nextLevelCode(pack), "level3");
+  const raw = JSON.stringify({ pack, baseline: pack, selectedLevelIndex: 999, source: { kind: "game", label: "LaMow", revision: "one" } });
+  const recovered = readMapWorkspace({ getItem: () => raw });
+  assert.equal(recovered.recovered, true); assert.equal(recovered.workspace.selectedLevelIndex, 0); assert.equal(recovered.workspace.source.revision, "one");
+  assert.ok(readMapWorkspace({ getItem: () => "broken" }).error);
+  assert.ok(readMapWorkspace({ getItem: () => { throw new Error("blocked"); } }).error);
+});
+
+test("level edits clamp a stale selection and follow a renamed startup level", () => {
+  const pack = clone(defaultPack); pack.defaultLevelCode = pack.levels[0].code;
+  const next = updateCurrentLevel(pack, 999, level => ({ ...level, code: "renamed", name: "Still editable" }));
+  assert.equal(next.defaultLevelCode, "renamed"); assert.equal(next.levels[0].name, "Still editable");
+});
 
 test("numeric fractions reserve constant columns and default holds reach tuning points 50% sooner", () => {
   assert.deepEqual(["24", "24.5", "25", "25.5"].map(value => numberFractionPadding(value, 0.5)), [2, 0, 2, 0]);

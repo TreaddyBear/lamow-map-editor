@@ -9,7 +9,7 @@ export function ImportExportPane({ value, message, samples, onJsonText, onCopy, 
       <Stack>
         <ActionRow className="items-center">
           <FileButton size="compact" accept="application/json,.json,.txt,text/plain" onFile={onOpenFile}>Import</FileButton>
-          <Button size="compact" tone="primary" type="button" onClick={onDownload}>Export</Button>
+          <Button size="compact" tone="primary" type="button" onClick={onDownload}>Export pack</Button>
           <Menu trigger={<Button size="compact" type="button">Samples</Button>}>
             {samples.map((sample) => <MenuItem key={sample.key} onSelect={() => onLoadSample(sample.key)}>{sample.label}</MenuItem>)}
           </Menu>

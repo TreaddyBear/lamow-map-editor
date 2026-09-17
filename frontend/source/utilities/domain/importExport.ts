@@ -59,6 +59,7 @@ export function importJsonText(text: string): ImportResult {
 }
 
 export function importJsonValue(parsed: unknown): ImportResult {
+  if (isRecord(parsed) && "bakedVersion" in parsed) throw new Error("This is a baked game build. Open lawn-maps.json to edit the authored levels.");
   if (isV1Pack(parsed)) return { pack: importV1Pack(parsed), message: `Imported draft v1 pack with ${parsed.levels.length} level(s).` };
   if (isRecord(parsed) && Array.isArray(parsed.maps)) {
     const maps = parsed.maps.map(importLegacyMap);
@@ -84,6 +85,8 @@ function isV1Pack(value: unknown): value is Record<string, unknown> & { levels: 
 function importV1Pack(value: Record<string, unknown> & { levels: unknown[] }): MapPackV1 {
   const packInfo = isRecord(value.pack) ? value.pack : {};
   return normalizePack({
+    ...value,
+    defaultLevelCode: typeof value.defaultLevelCode === "string" ? value.defaultLevelCode : undefined,
     version: 1,
     units: "meters",
     coordinates: isRecord(value.coordinates) ? (value.coordinates as CoordinateMetadata) : defaultCoordinates,
@@ -96,6 +99,8 @@ function importV1Pack(value: Record<string, unknown> & { levels: unknown[] }): M
 function importV1Level(value: unknown): LevelV1 {
   if (!isRecord(value)) throw new Error("Level entry must be an object.");
   return normalizeLevel({
+    ...value,
+    fullCode: typeof value.fullCode === "string" ? value.fullCode : undefined,
     code: String(value.code ?? "level"),
     name: String(value.name ?? "Level"),
     parSeconds: Number(value.parSeconds) || 300,

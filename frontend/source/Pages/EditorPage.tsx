@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Star } from "lucide-react";
+import { levelCode, levelIndex, mapDraftKey, nextLevelCode, readMapWorkspace, type MapSource } from "../utilities/editor/mapWorkspace";
 import { blueprintFromArea, createAreaFromBlueprint } from "../utilities/domain/blueprints";
 import { translateArea, translatePathShape, translateShape } from "../utilities/domain/geometry";
 import { exportJsonValue, importJsonText } from "../utilities/domain/importExport";
@@ -18,7 +20,7 @@ import { SnapControls } from "../Views/SnapControls";
 import { SettingsDialog } from "../Views/SettingsDialog";
 import { Viewport } from "../Views/Viewport";
 import { ViewportToolbar } from "../Views/ViewportToolbar";
-import { AppShell, CanvasPanelLayout, FloatingAsideLayout, MapStage, Panel, PanelHeader, SidebarSlot, StatusMessage, StatusStrip } from "../Components/Base";
+import { AppShell, Button, Popover, CanvasPanelLayout, FloatingAsideLayout, MapStage, Panel, PanelHeader, SidebarSlot, StatusMessage, StatusStrip } from "../Components/Base";
 import type { AppView } from "./App";
 
 type EditorPageProps = {
@@ -26,9 +28,20 @@ type EditorPageProps = {
 };
 
 export function EditorPage({ onViewChange }: EditorPageProps) {
+  const [initial] = useState(() => readMapWorkspace({ getItem: key => localStorage.getItem(key) }));
+  const [source, setSource] = useState<MapSource>(initial.workspace.source);
+  const [draftError, setDraftError] = useState(initial.error ?? "");
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [replacement, setReplacement] = useState<{ pack: MapPackV1; source: MapSource; message: string } | null>(null);
+  const [game, setGame] = useState<{ pack: MapPackV1; revision: string; source: string; baked: { status: string; codes: string[] } } | null>(null);
+  const [gameError, setGameError] = useState("");
+  const [gameLoading, setGameLoading] = useState(true);
+  const editEpoch = useRef(0);
+  const sourceRequest = useRef(0);
+  const [viewEpoch, setViewEpoch] = useState(0);
   const [state, setState] = useState<EditorState>(() => ({
-    pack: clone(defaultPack),
-    selectedLevelIndex: 0,
+    pack: initial.workspace.pack,
+    selectedLevelIndex: initial.workspace.selectedLevelIndex,
     selection: { kind: "level" },
     canvasTool: "select",
     pendingPath: null,
@@ -44,7 +57,7 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
   }));
   const [history, setHistory] = useState<MapPackV1[]>([]);
   const [redoHistory, setRedoHistory] = useState<MapPackV1[]>([]);
-  const [loadedPack, setLoadedPack] = useState<MapPackV1>(() => clone(defaultPack));
+  const [loadedPack, setLoadedPack] = useState<MapPackV1>(initial.workspace.baseline);
   const [blueprintsOpen, setBlueprintsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -55,8 +68,57 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
   const exportValue = useMemo(() => JSON.stringify(exportJsonValue(state.pack), null, 2), [state.pack]);
   const jsonValue = state.jsonText || exportValue;
   const theme = state.pack.editor?.theme ?? "light";
+  const dirty = useMemo(() => JSON.stringify(state.pack) !== JSON.stringify(loadedPack), [state.pack, loadedPack]);
+  const isDefault = state.pack.defaultLevelCode === level.code || state.pack.defaultLevelCode === levelCode(state.pack, level);
+
+  useEffect(() => {
+    if (initial.error) return; // Keep an unreadable draft intact for recovery.
+    try {
+      localStorage.setItem(mapDraftKey, JSON.stringify({ pack: state.pack, baseline: loadedPack, selectedLevelIndex: state.selectedLevelIndex, source }));
+      setDraftError("");
+    } catch { setDraftError("Map autosave unavailable. Export the pack before leaving."); }
+  }, [state.pack, state.selectedLevelIndex, loadedPack, source, initial.error]);
+
+  const refreshGame = async (signal?: AbortSignal) => {
+    const requestId = ++sourceRequest.current;
+    setGameLoading(true);
+    try {
+      const response = await fetch("/api/game-maps", { signal, cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not open LaMow maps.");
+      const pack = importJsonText(JSON.stringify(result.pack)).pack;
+      if (signal?.aborted || requestId !== sourceRequest.current) return;
+      setGame({ ...result, pack }); setGameError("");
+      if (!initial.recovered && !initial.error && editEpoch.current === 0) replacePack(pack, { kind: "game", label: result.source, revision: result.revision }, "Opened LaMow maps.");
+    } catch (error) { if (!signal?.aborted && requestId === sourceRequest.current) { setGame(null); setGameError(error instanceof Error ? error.message : "LaMow maps unavailable."); } }
+    finally { if (!signal?.aborted && requestId === sourceRequest.current) setGameLoading(false); }
+  };
+  useEffect(() => {
+    const controller = new AbortController();
+    void refreshGame(controller.signal);
+    const onFocus = () => { void refreshGame(controller.signal); };
+    window.addEventListener("focus", onFocus);
+    return () => { controller.abort(); window.removeEventListener("focus", onFocus); };
+  }, []);
+
+  const switchLevel = (index: number) => {
+    if (!state.pack.levels[index]) return;
+    editEpoch.current++;
+    setState(current => ({ ...current, selectedLevelIndex: index, selection: { kind: "level" }, pendingPath: null, contextMenu: null, activeViewportBounds: null, canvasTool: "select", jsonText: "" }));
+  };
+
+  function replacePack(pack: MapPackV1, nextSource: MapSource, message: string) {
+    editEpoch.current++; setViewEpoch(value => value + 1);
+    setLoadedPack(clone(pack)); setSource(nextSource); setHistory([]); setRedoHistory([]); setReplacement(null); setSourceOpen(false);
+    setState(current => ({ ...current, pack, selectedLevelIndex: levelIndex(pack, pack.defaultLevelCode), selection: { kind: "level" }, canvasTool: "select", pendingPath: null, contextMenu: null, activeViewportBounds: null, jsonText: "", importMessage: message }));
+  }
+  const requestPack = (pack: MapPackV1, nextSource: MapSource, message: string) => {
+    if (dirty) { setReplacement({ pack, source: nextSource, message }); setSourceOpen(true); }
+    else replacePack(pack, nextSource, message);
+  };
 
   const record = (updater: (current: EditorState) => EditorState, historyEntry = true) => {
+    editEpoch.current++;
     if (historyEntry) {
       setHistory((items) => [...items, clone(state.pack)].slice(-100));
       setRedoHistory([]);
@@ -140,7 +202,7 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
 
   const addFromTree = (kind: "level" | "area" | "road" | "dirtPath" | "fence" | "hill") => {
     if (kind === "level") {
-      record((current) => ({ ...current, pack: { ...current.pack, levels: [...current.pack.levels, { ...clone(defaultPack.levels[0]), code: `level${current.pack.levels.length + 1}`, name: `Level ${current.pack.levels.length + 1}` }] }, selectedLevelIndex: current.pack.levels.length, selection: { kind: "level" } }));
+      record((current) => ({ ...current, pack: { ...current.pack, levels: [...current.pack.levels, { ...clone(defaultPack.levels[0]), code: nextLevelCode(current.pack), name: `Level ${nextLevelCode(current.pack).slice(5)}` }] }, selectedLevelIndex: current.pack.levels.length, selection: { kind: "level" }, activeViewportBounds: null, pendingPath: null, contextMenu: null, canvasTool: "select", jsonText: "" }));
     } else if (kind === "area") addArea([0, 0], state.selection.kind === "area" ? state.selection.path : undefined);
     else if (kind === "hill") addHill([0, 0]);
     else if (kind === "road") addPathItem("road", [-4, 0], [4, 0]);
@@ -187,7 +249,7 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
     if (!previous) return;
     setRedoHistory((items) => [...items, clone(state.pack)].slice(-100));
     setHistory((items) => items.slice(0, -1));
-    setState((current) => ({ ...current, pack: previous, selection: { kind: "level" }, importMessage: "Undid last edit." }));
+    setState((current) => ({ ...current, pack: previous, selectedLevelIndex: Math.min(current.selectedLevelIndex, previous.levels.length - 1), selection: { kind: "level" }, pendingPath: null, contextMenu: null, activeViewportBounds: null, jsonText: "", importMessage: "Undid last edit." }));
   };
 
   const redo = () => {
@@ -195,7 +257,7 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
     if (!next) return;
     setHistory((items) => [...items, clone(state.pack)].slice(-100));
     setRedoHistory((items) => items.slice(0, -1));
-    setState((current) => ({ ...current, pack: next, selection: { kind: "level" }, importMessage: "Redid last edit." }));
+    setState((current) => ({ ...current, pack: next, selectedLevelIndex: Math.min(current.selectedLevelIndex, next.levels.length - 1), selection: { kind: "level" }, pendingPath: null, contextMenu: null, activeViewportBounds: null, jsonText: "", importMessage: "Redid last edit." }));
   };
 
   const setCanvasTool = (tool: CanvasTool) => {
@@ -232,8 +294,7 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
     try {
       const result = importJsonText(text);
       const pack = normalizePack(result.pack);
-      setLoadedPack(clone(pack));
-      record((current) => ({ ...current, pack: clone(pack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: result.message }));
+      requestPack(pack, { kind: "file", label: pack.pack.name }, result.message);
     } catch (error) {
       setState((current) => ({ ...current, importMessage: error instanceof Error ? error.message : "Could not import JSON." }));
     }
@@ -244,29 +305,45 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${(level.code || "lamow-map").replace(/[^\w.-]+/g, "-")}.json`;
+    anchor.download = "lawn-maps.json";
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
-    setState((current) => ({ ...current, importMessage: "Exported JSON download." }));
+    setState((current) => ({ ...current, importMessage: `Exported all ${state.pack.levels.length} levels as lawn-maps.json. Install and rebake in LaMow to update the game.` }));
   };
 
   const revertLoadedPack = () => {
-    record((current) => ({ ...current, pack: clone(loadedPack), selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: "Reverted to the last loaded map." }));
+    requestPack(clone(loadedPack), source, "Reverted to the last opened pack.");
   };
 
   const loadSample = (key: string) => {
     const sample = samplePacks.find((item) => item.key === key);
     if (!sample) return;
     const pack = normalizePack(sample.create());
-    setLoadedPack(clone(pack));
-    record((current) => ({ ...current, pack, selectedLevelIndex: 0, selection: { kind: "level" }, jsonText: "", importMessage: `Loaded ${sample.label}.` }));
+    requestPack(pack, { kind: "sample", label: sample.label }, `Loaded ${sample.label}.`);
   };
 
   return (
     <AppShell leftCollapsed={state.sidebarCollapsed} rightOpen={state.importPanelOpen}>
       <AppTopBar
+        levelControls={<>
+          <Popover open={sourceOpen} onOpenChange={open => { setSourceOpen(open); if (!open) setReplacement(null); }} trigger={<Button size="compact" title={source.label}>{source.kind === "game" ? "LaMow maps" : source.kind === "file" ? "Imported pack" : "Sample pack"}{dirty ? " *" : ""}</Button>}>
+            <div className="grid max-w-sm gap-2 rounded border border-[var(--surface-border)] bg-[var(--surface-bg)] p-3 text-sm">
+              {replacement ? <><strong>Replace this map draft?</strong><div className="flex gap-2"><Button size="compact" onClick={() => { setReplacement(null); setSourceOpen(false); }}>Cancel</Button><Button size="compact" onClick={() => replacePack(replacement.pack, replacement.source, replacement.message)}>Replace draft</Button></div></> : <>
+                <strong>{source.label}</strong>
+                <span>{dirty ? (draftError ? "Draft not saved" : "Draft saved in this browser") : "No local changes"}</span>
+                {game && <span data-testid="game-map-status">{game.baked.status === "current" ? "Game bake matches its map source" : game.baked.status === "stale" ? "Game bake is older than its map source" : "Game bake unavailable"}{source.kind === "game" && source.revision !== game.revision ? " · Newer source available" : ""}</span>}
+                {gameError && <span role="alert">{gameError}</span>}
+                <div className="flex flex-wrap gap-2"><Button size="compact" disabled={!game || gameLoading} onClick={() => game && requestPack(game.pack, { kind: "game", label: game.source, revision: game.revision }, "Opened LaMow maps.")}>Open LaMow maps</Button><Button size="compact" disabled={gameLoading} onClick={() => void refreshGame()}>Refresh source</Button><Button size="compact" onClick={downloadJson}>Export pack</Button></div>
+              </>}
+            </div>
+          </Popover>
+          <select aria-label="Current level" value={state.selectedLevelIndex} onChange={event => switchLevel(Number(event.target.value))} className="h-9 max-w-[min(24rem,35vw)] rounded border border-[var(--input-border)] bg-[var(--input-bg)] px-2 text-sm font-semibold" data-testid="level-selector">
+            {state.pack.levels.map((item, index) => <option key={index} value={index}>{item.name} · {item.code}</option>)}
+          </select>
+          <Button size="icon" aria-label={isDefault ? "Game startup level" : "Use this level at game startup"} title={isDefault ? "Game startup level" : "Use this level at game startup"} aria-pressed={isDefault} onClick={() => { if (!isDefault) record(current => ({ ...current, pack: { ...current.pack, defaultLevelCode: level.code }, jsonText: "" })); }}><Star size={16} fill={isDefault ? "currentColor" : "none"}/></Button>
+        </>}
         sidebarCollapsed={state.sidebarCollapsed}
         rightSidebarOpen={state.importPanelOpen}
         onViewChange={onViewChange}
@@ -275,7 +352,7 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
         onOpenBlueprints={() => setBlueprintsOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <Panel as="aside">
+      <Panel as="aside" className="grid-rows-[minmax(0,1fr)]">
         <SidebarSlot>
           {state.sidebarCollapsed ? null : (
             <Sidebar
@@ -291,14 +368,14 @@ export function EditorPage({ onViewChange }: EditorPageProps) {
           )}
         </SidebarSlot>
       </Panel>
-      <Panel>
+      <Panel className="grid-rows-[minmax(0,1fr)]">
         <CanvasPanelLayout>
           <ViewportToolbar activeTool={state.canvasTool} pinnedAreaBlueprintKeys={state.pinnedAreaBlueprintKeys} customBlueprints={state.pack.editor?.blueprints ?? []} canUndo={history.length > 0} canRedo={redoHistory.length > 0} onTool={setCanvasTool} onAdd={(kind) => addFromTree(kind)} onAddBlueprintAtOrigin={(key) => addBlueprint(key, [0, 0])} onUndo={undo} onRedo={redo} />
           <MapStage>
             <SnapControls settings={state.snap} onChange={(snap) => setState((current) => ({ ...current, snap }))} />
-            <Viewport level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
+            <Viewport key={`${viewEpoch}:${state.selectedLevelIndex}`} level={level} bounds={bounds} selection={state.selection} canvasTool={state.canvasTool} pendingPath={state.pendingPath} snap={state.snap} onSelect={(selection) => setState((current) => ({ ...current, selection }))} onClearSelection={() => setState((current) => ({ ...current, selection: { kind: "level" } }))} onUpdateLevel={(updater, historyEntry = true) => updateLevel(updater, historyEntry)} onContextMenu={(screenX, screenY, world, target) => setState((current) => ({ ...current, contextMenu: { screenX, screenY, world, target } }))} onAddArea={addArea} onAddHill={addHill} onPathToolClick={pathToolClick} onFreezeViewport={() => setState((current) => ({ ...current, activeViewportBounds: getBounds(level) }))} onReleaseViewport={() => setState((current) => ({ ...current, activeViewportBounds: null }))} />
           </MapStage>
-          <StatusStrip>{validation.length === 0 ? <StatusMessage>Draft v1 shape validates for the checks currently implemented.</StatusMessage> : validation.map((error) => <StatusMessage key={error} tone="error">{error}</StatusMessage>)}</StatusStrip>
+          <StatusStrip>{draftError && <StatusMessage tone="error">{draftError}</StatusMessage>}{gameLoading ? <StatusMessage>Checking LaMow maps…</StatusMessage> : source.kind === "game" ? <StatusMessage>{state.pack.levels.length} levels · {dirty ? "Editor draft" : "Game source"}{game && source.revision !== game.revision ? " · Newer game source available" : ""}{game?.baked.status === "stale" ? " · Game needs rebaking" : ""}</StatusMessage> : <StatusMessage>{source.label} · {state.pack.levels.length} levels{gameError ? " · Game source unavailable" : ""}</StatusMessage>}{validation.map((error) => <StatusMessage key={error} tone="error">{error}</StatusMessage>)}</StatusStrip>
         </CanvasPanelLayout>
       </Panel>
       {state.importPanelOpen ? (

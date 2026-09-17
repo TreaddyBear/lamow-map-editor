@@ -1,8 +1,10 @@
 import { Boxes, Map, Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { ActionRow, Button, Menu, MenuItem, MenuLabel, MenuSeparator, TopBar, TopBarTitle } from "../Components/Base";
 import type { AppView } from "../Pages/App";
+import type { ReactNode } from "react";
 
 type Props = {
+  levelControls?: ReactNode;
   sidebarCollapsed: boolean;
   rightSidebarOpen: boolean;
   onViewChange: (view: AppView) => void;
@@ -12,7 +14,7 @@ type Props = {
   onOpenSettings: () => void;
 };
 
-export function AppTopBar({ sidebarCollapsed, rightSidebarOpen, onViewChange, onToggleSidebar, onToggleRightSidebar, onOpenBlueprints, onOpenSettings }: Props) {
+export function AppTopBar({ levelControls, sidebarCollapsed, rightSidebarOpen, onViewChange, onToggleSidebar, onToggleRightSidebar, onOpenBlueprints, onOpenSettings }: Props) {
   return (
     <TopBar>
       <ActionRow className="items-center">
@@ -29,6 +31,7 @@ export function AppTopBar({ sidebarCollapsed, rightSidebarOpen, onViewChange, on
         <TopBarTitle>LaMow Editor</TopBarTitle>
       </ActionRow>
       <ActionRow className="items-center">
+        {levelControls}
         <Button size="icon" type="button" title={rightSidebarOpen ? "Hide right sidebar" : "Show right sidebar"} tone={rightSidebarOpen ? "primary" : "default"} onClick={onToggleRightSidebar}>{rightSidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}</Button>
       </ActionRow>
     </TopBar>

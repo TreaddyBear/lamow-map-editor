@@ -1,8 +1,9 @@
 # LaMow Map Editor
 
 React map and vegetation authoring tools for LaMow. The editor runs separately from the game.
-Vegetation can be edited, exported, and checked in an independent Playtest scene. **The main
-game does not yet load these vegetation exports.** Start with the [LaMow handoff](docs/LAMOW_HANDOFF.md) when continuing in the game.
+Vegetation can be edited, exported, and checked in an independent Playtest scene. The
+[September 15 LaMow handoff](docs/LAMOW_HANDOFF.md) records that renderer checkpoint;
+subsequent game integration lives in the LaMow repository.
 
 ## Run and build
 
@@ -136,11 +137,28 @@ game-side asset loader and mowing adapter remain the next integration boundary.
 
 ## Maps are a separate export
 
-The map editor at `/` exports a draft-v1 map pack: levels, areas, terrain, and vegetation
-type/density references. Its download is not a vegetation species asset. Map edits currently
-live in page state and do **not** have the vegetation draft autosave; export before navigating
-away or refreshing. An asset export does not embed a map, and a map export does not embed your
-custom clover recipe.
+The map editor at `/` opens the adjacent LaMow project's `map-exports/lawn-maps.json` when
+starting without a saved draft. The **top-bar level selector** switches among every level
+in the opened pack. Switching cancels unfinished drawing and fits the selected map. The
+star marks the game's startup level; selecting another level does not change that setting.
+Click the star to deliberately make the selected level the startup level.
+
+Map edits and the selected level now survive reloads and visits to the vegetation editor
+in this browser. The pack button shows `*` for a modified draft. This browser-local draft
+is separate from the vegetation version library; **Export pack** remains the portable backup.
+Opening another pack or reverting asks before replacing a modified draft.
+
+Click **LaMow maps** (or **Sample pack / Imported pack**) in the top bar for **Open LaMow
+maps**, **Refresh source**, and **Export pack**. The source panel distinguishes the authored
+map source from its baked artifact and reports stale bakes or a newer source. Returning
+focus refreshes this status without overwriting your draft. The bridge reads the sibling
+project only; it does not change files or inspect which level is selected in a running game.
+For a different game checkout, set `LAMOW_PROJECT_DIR` before starting `pnpm dev` or
+`pnpm preview`. Without a game checkout/server, use Import to open `lawn-maps.json` manually.
+
+**Export pack** downloads **all levels** as `lawn-maps.json`, preserving `defaultLevelCode`
+and explicit `fullCode` identities. Baked JSON is rejected because it is generated output.
+Map and vegetation exports remain separate: a map pack does not embed custom clover recipes.
 
 The game's production map source is `map-exports/lawn-maps.json`. Its own `pnpm bake` produces
 `map-exports/lawn-maps.baked.json`, which the game loads. Map integration requires validating

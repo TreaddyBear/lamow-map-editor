@@ -111,7 +111,12 @@ export function moveSelection(level: LevelV1, item: Selection, dx: number, dz: n
 }
 
 export function updateCurrentLevel(pack: MapPackV1, selectedLevelIndex: number, updater: (level: LevelV1) => LevelV1): MapPackV1 {
-  return normalizePack({ ...pack, levels: pack.levels.map((level, index) => (index === selectedLevelIndex ? updater(level) : level)) });
+  const index = Math.max(0, Math.min(pack.levels.length - 1, selectedLevelIndex));
+  const previous = currentLevel(pack, index), next = updater(previous);
+  const fullCode = previous.fullCode ?? pack.pack.prefix + previous.code.charAt(0).toUpperCase() + previous.code.slice(1);
+  const nextFullCode = next.fullCode ?? pack.pack.prefix + next.code.charAt(0).toUpperCase() + next.code.slice(1);
+  const defaultLevelCode = pack.defaultLevelCode === previous.code ? next.code : pack.defaultLevelCode === fullCode ? nextFullCode : pack.defaultLevelCode;
+  return normalizePack({ ...pack, defaultLevelCode, levels: pack.levels.map((level, i) => i === index ? next : level) });
 }
 
 export function tagsText(tags?: string[]): string {

@@ -23,6 +23,7 @@ export function collectAuthoredIds(level: LevelV1): string[] {
 
 export function validateLevel(currentPack: MapPackV1, level: LevelV1): string[] {
   const errors: string[] = [];
+  if (currentPack.defaultLevelCode && !currentPack.levels.some(item => item.code === currentPack.defaultLevelCode || (item.fullCode ?? currentPack.pack.prefix + item.code.charAt(0).toUpperCase() + item.code.slice(1)) === currentPack.defaultLevelCode)) errors.push("The game startup level is not in this pack.");
   if (currentPack.version !== 1) errors.push("Map pack version must be 1.");
   if (currentPack.units !== "meters") errors.push('Map pack units must be "meters".');
   if (!currentPack.pack.prefix.trim()) errors.push("Pack prefix is required.");

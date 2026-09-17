@@ -32,6 +32,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function normalizePack(value: MapPackV1): MapPackV1 {
   return {
+    ...value,
     version: 1,
     units: "meters",
     coordinates: value.coordinates,
@@ -64,6 +65,7 @@ export function normalizeEditorBlueprint(value: EditorBlueprint): EditorBlueprin
 
 export function normalizeLevel(level: LevelV1): LevelV1 {
   return {
+    ...level,
     code: level.code ?? "level",
     name: level.name ?? "Level",
     parSeconds: Math.max(1, Number(level.parSeconds) || 300),

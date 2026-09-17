@@ -38,7 +38,7 @@ export function MapStage({ children }: { children: ReactNode }) {
 }
 
 export function StatusStrip({ children }: { children: ReactNode }) {
-  return <div className="grid gap-2 border-t border-[var(--surface-border)] px-4 py-3">{children}</div>;
+  return <div className="grid max-h-32 gap-2 overflow-auto border-t border-[var(--surface-border)] px-4 py-3">{children}</div>;
 }
 
 export function SidebarSlot({ children }: { children?: ReactNode }) {

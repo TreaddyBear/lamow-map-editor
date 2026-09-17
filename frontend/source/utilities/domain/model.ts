@@ -38,11 +38,13 @@ export type MapPackV1 = {
   coordinates?: CoordinateMetadata;
   pack: PackInfo;
   levels: LevelV1[];
+  defaultLevelCode?: string;
   editor?: EditorMetadata;
 };
 
 export type LevelV1 = {
   code: string;
+  fullCode?: string;
   name: string;
   parSeconds: number;
   spawn: Spawn;
